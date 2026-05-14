@@ -126,7 +126,7 @@ pkg_update() {
 }
 
 pkg_deps() {
-  pkgs="curl ca-certificates tar gzip"
+  pkgs="curl ca-certificates tar gzip git make"
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
     apt-get install -y $pkgs
@@ -175,16 +175,60 @@ install_binary() {
   if [ -n "$DOWNLOAD_URL" ]; then
     log "Downloading EasyNode binary"
     tmp="$(mktemp)"
-    curl -fL "$DOWNLOAD_URL" -o "$tmp"
-    install -m 755 "$tmp" "$BIN"
+    if curl -fL "$DOWNLOAD_URL" -o "$tmp"; then
+      install -m 755 "$tmp" "$BIN"
+      rm -f "$tmp"
+      return
+    fi
     rm -f "$tmp"
+    if [ -z "$GITHUB_REPO" ]; then
+      die "Binary download failed: $DOWNLOAD_URL"
+    fi
+    warn "Release binary not found, falling back to source build"
   elif [ -f ./dist/easynode ]; then
     install -m 755 ./dist/easynode "$BIN"
+    return
   elif [ -f ./dist/easynode-linux-"$EASYNODE_ARCH" ]; then
     install -m 755 ./dist/easynode-linux-"$EASYNODE_ARCH" "$BIN"
+    return
   else
-    die "No binary found. Pass --url URL or run make build-linux-$EASYNODE_ARCH first."
+    if [ -z "$GITHUB_REPO" ]; then
+      die "No binary found. Pass --url URL, --repo OWNER/REPO, or run make build-linux-$EASYNODE_ARCH first."
+    fi
   fi
+
+  build_from_source
+}
+
+install_go_if_missing() {
+  if command -v go >/dev/null 2>&1; then
+    return
+  fi
+  log "Installing Go toolchain"
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y
+    apt-get install -y golang-go
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y golang
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y golang
+  else
+    die "Go is not installed and no supported package manager found"
+  fi
+}
+
+build_from_source() {
+  install_go_if_missing
+  command -v git >/dev/null 2>&1 || die "git is required for source build"
+  command -v make >/dev/null 2>&1 || die "make is required for source build"
+
+  src="$(mktemp -d)"
+  log "Cloning source from https://github.com/${GITHUB_REPO}.git"
+  git clone --depth 1 "https://github.com/${GITHUB_REPO}.git" "$src"
+  log "Building EasyNode from source"
+  (cd "$src" && go build -o "$src/easynode" ./cmd/easynode)
+  install -m 755 "$src/easynode" "$BIN"
+  rm -rf "$src"
 }
 
 write_service() {

@@ -19,11 +19,13 @@ EasyNode 是一个面向普通用户的智能代理节点面板。目标是让�
 
 ## 一行安装
 
-如果仓库已经发布 Release，并上传了 `easynode-linux-amd64` 或 `easynode-linux-arm64`，服务器可执行：
+推荐一行安装：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode
 ```
+
+脚本会优先下载 GitHub Release 里的 `easynode-linux-amd64` 或 `easynode-linux-arm64`。如果还没有发布 Release，会自动 fallback 到源码构建。
 
 交互式安装：
 
@@ -35,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/i
 
 - 检测系统和 CPU 架构
 - 可选升级系统软件包
-- 可选安装常用依赖
+- 可选安装常用依赖：`curl`、`ca-certificates`、`tar`、`gzip`、`git`、`make`
 - 可选启用 BBR 加速
 - 创建数据目录并设置权限
 - 安装 systemd 服务
@@ -55,7 +57,7 @@ curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/i
 
 ## 服务器源码测试
 
-如果还没有发布 Release，可以先在服务器上用源码构建测试：
+你也可以手动源码构建测试：
 
 ```bash
 apt update && apt install -y git golang make
