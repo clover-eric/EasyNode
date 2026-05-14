@@ -1,71 +1,85 @@
 # EasyNode
 
-EasyNode is an intelligent proxy node panel for regular users. It hides protocol complexity behind a simple setup flow: enter a domain, keep the recommended plans, then copy the subscription into a client.
+EasyNode 是一个面向普通用户的智能代理节点面板。目标是让用户不再纠结 VLESS、Reality、TLS、WebSocket、Hysteria2、TUIC 等底层选择，只需要输入域名或选择 IP 直连，系统自动生成推荐节点。
 
-## Features
+默认界面支持中文和 English，可在页面右上角切换。
 
-- Single Go binary with embedded web UI
-- Chinese / English interface
-- First-run setup wizard
-- Recommended node plans: VLESS Reality, Hysteria2, Trojan TLS, VLESS WS TLS, TUIC
-- Human-readable protocol guidance: score, use case, compatible clients, tradeoffs
-- Subscription link generation
-- sing-box config generation
-- Chain proxy pairing code flow
-- Settings page for password, domain, IP direct mode, and panel path
-- JSON persistence under the data directory
+## 主要功能
 
-## One-Line Install
+- Go 单二进制程序，内置 Web 面板
+- 中英文界面切换
+- 首次访问初始化向导
+- 智能推荐节点方案：VLESS Reality、Hysteria2、Trojan TLS、VLESS WS TLS、TUIC
+- 用普通用户能理解的方式说明每种节点：推荐度、适用场景、适配软件、优缺点
+- 订阅链接生成
+- sing-box 配置生成
+- 链式代理配对码流程
+- 设置页面：修改管理员密码、域名、IP 直连模式、面板路径
+- 数据持久化到数据目录
 
-After publishing release binaries, users can install on a Linux server with one command:
+## 一行安装
 
-```bash
-curl -fsSL https://your-domain.com/install.sh | bash -s -- --yes --url https://your-domain.com/easynode-linux-amd64
-```
-
-If hosted on GitHub Releases:
+如果仓库已经发布 Release，并上传了 `easynode-linux-amd64` 或 `easynode-linux-arm64`，服务器可执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | bash -s -- --yes --repo OWNER/REPO
+curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode
 ```
 
-Interactive install:
+交互式安装：
 
 ```bash
-curl -fsSL https://your-domain.com/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --repo clover-eric/EasyNode
 ```
 
-The installer can:
+安装脚本会自动：
 
-- upgrade system packages
-- install common dependencies
-- enable BBR acceleration
-- create data directory with restrictive permissions
-- install systemd service
-- open the panel port when `ufw` or `firewalld` is active
-- print the panel URL and next steps
+- 检测系统和 CPU 架构
+- 可选升级系统软件包
+- 可选安装常用依赖
+- 可选启用 BBR 加速
+- 创建数据目录并设置权限
+- 安装 systemd 服务
+- 设置开机自启
+- 在启用 `ufw` 或 `firewalld` 时开放面板端口
+- 输出面板访问地址
 
-Useful installer options:
+常用参数：
 
 ```bash
-bash scripts/install.sh --yes --url https://your-domain.com/easynode-linux-amd64
-bash scripts/install.sh --port 8088 --skip-upgrade --skip-bbr
-bash scripts/install.sh --data-dir /var/lib/easynode
+# 指定端口
+curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --port 8088
+
+# 跳过系统升级和 BBR
+curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr
 ```
 
-## Local Run
+## 服务器源码测试
+
+如果还没有发布 Release，可以先在服务器上用源码构建测试：
+
+```bash
+apt update && apt install -y git golang make
+git clone https://github.com/clover-eric/EasyNode.git
+cd EasyNode
+make build
+bash scripts/install.sh --yes --skip-upgrade --skip-bbr
+```
+
+然后打开安装脚本输出的面板地址。
+
+## 本地运行
 
 ```bash
 go run ./cmd/easynode -addr :8088 -data data
 ```
 
-Open:
+访问：
 
 ```text
 http://127.0.0.1:8088
 ```
 
-## Build
+## 构建
 
 ```bash
 make build
@@ -73,26 +87,23 @@ make build-linux-amd64
 make build-linux-arm64
 ```
 
-Windows local binary:
+构建输出：
 
 ```text
-dist/easynode.exe
-```
-
-Linux release binaries:
-
-```text
+dist/easynode
 dist/easynode-linux-amd64
 dist/easynode-linux-arm64
 ```
 
-## Production Gaps
+## 当前状态
 
-Current version is a working MVP. Production still needs:
+当前版本是可运行 MVP，已经适合测试面板流程、节点推荐逻辑、订阅生成和基础部署流程。
 
-- ACME certificate automation
-- real sing-box process management
-- real DNS/IP/port/UDP probing
-- SQLite storage
-- cross-server pairing handshake
-- signed release checksums
+生产环境还需要继续补齐：
+
+- ACME 自动证书
+- 真实 sing-box 进程托管和热重载
+- 真实 DNS/IP/端口/UDP 探测
+- SQLite 存储
+- 跨服务器链式代理密钥握手
+- Release 自动构建和校验文件
