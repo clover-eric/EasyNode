@@ -381,7 +381,10 @@ func (s *Server) Static(w http.ResponseWriter, r *http.Request) {
 	if _, err := sub.Open(path); err != nil {
 		path = "index.html"
 	}
-	http.ServeFileFS(w, r, sub, path)
+	r2 := new(http.Request)
+	*r2 = *r
+	r2.URL.Path = "/" + path
+	http.FileServer(http.FS(sub)).ServeHTTP(w, r2)
 }
 
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
