@@ -15,6 +15,10 @@ DO_FIREWALL="ask"
 DOWNLOAD_URL="${EASYNODE_BIN_URL:-}"
 GITHUB_REPO="${EASYNODE_GITHUB_REPO:-}"
 
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
+
 usage() {
   cat <<EOF
 EasyNode installer
@@ -115,7 +119,7 @@ ask() {
 pkg_update() {
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
-    apt-get upgrade -y
+    apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
   elif command -v dnf >/dev/null 2>&1; then
     dnf upgrade -y
   elif command -v yum >/dev/null 2>&1; then
@@ -129,7 +133,7 @@ pkg_deps() {
   pkgs="curl ca-certificates tar gzip git make"
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
-    apt-get install -y $pkgs
+    apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" $pkgs
   elif command -v dnf >/dev/null 2>&1; then
     dnf install -y $pkgs
   elif command -v yum >/dev/null 2>&1; then
@@ -207,7 +211,7 @@ install_go_if_missing() {
   log "Installing Go toolchain"
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
-    apt-get install -y golang-go
+    apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" golang-go
   elif command -v dnf >/dev/null 2>&1; then
     dnf install -y golang
   elif command -v yum >/dev/null 2>&1; then

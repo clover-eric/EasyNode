@@ -1,5 +1,7 @@
 # Build outputs
 dist/
+!cmd/easynode/dist/
+!cmd/easynode/dist/**
 
 # Runtime data
 data/
