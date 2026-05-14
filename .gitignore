@@ -1,0 +1,18 @@
+# Build outputs
+dist/
+
+# Runtime data
+data/
+tmpdata/
+tmpdata_api/
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Go
+*.test
+coverage.out
