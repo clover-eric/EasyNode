@@ -69,6 +69,8 @@ const copyText = {
     chainRemoved: "已解除配对",
     remotePairingClosed: "落地已关闭配对",
     pairedBy: "已被配对",
+    pairedEntries: "入口主机",
+    pairedExits: "落地出口",
     exitNotifyFailed: "已配对，但落地机未收到通知",
     expired: "过期",
     paired: "配对完成",
@@ -186,6 +188,8 @@ const copyText = {
     chainRemoved: "Unpaired",
     remotePairingClosed: "Exit pairing disabled",
     pairedBy: "Paired by",
+    pairedEntries: "Entry servers",
+    pairedExits: "Exit servers",
     exitNotifyFailed: "Paired, but exit server was not notified",
     expired: "expires",
     paired: "Paired",
@@ -430,24 +434,24 @@ function renderLogin() {
 function chainPeersHTML() {
   const peers = state.chain_peers || [];
   if (!peers.length) return `<div class="notice">${t("noPeers")}</div>`;
-  return peers.map(p => {
+  return `<div class="sectionTitle chainListTitle"><span>${t("pairedExits")}</span><em>${peers.length}</em></div>${peers.map(p => {
     const endpoint = p.endpoint || "-";
     const host = shortHost(endpoint);
     const name = shortPeerName(p.name, endpoint);
     const status = p.remote_pairing_disabled ? t("remotePairingClosed") : (p.status === "paired" ? t("paired") : esc(p.status || "-"));
     const tone = p.remote_pairing_disabled ? "warn" : "";
     const latency = p.remote_latency_ms ? `${p.remote_latency_ms}ms ${t("peerLatency")}` : `- ${t("peerLatency")}`;
-    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)} · ${esc(latency)}</span></div><span class="chainPeerActions"><em class="${tone}">${status}</em><button class="btn ghost" data-unpair="${esc(p.id)}">${t("unpair")}</button></span></div>`;
-  }).join("");
+    return `<div class="chainPeer"><div class="chainPeerMain"><b>${esc(name)}</b><span>${esc(host)}</span></div><div class="chainPeerMeta"><i>${esc(latency)}</i><em class="${tone}">${status}</em></div><span class="chainPeerActions"><button class="btn ghost" data-unpair="${esc(p.id)}">${t("unpair")}</button></span></div>`;
+  }).join("")}`;
 }
 
 function chainClientsSectionHTML() {
   const clients = state.chain_clients || [];
   if (!clients.length) return "";
-  return `<div class="sectionTitle"><span>${t("pairedBy")}</span></div><div class="chainPeers">${clients.map(c => {
+  return `<div class="sectionTitle chainListTitle"><span>${t("pairedEntries")}</span><em>${clients.length}</em></div><div class="chainPeers chainClients">${clients.map(c => {
     const endpoint = c.endpoint || "-";
     const latency = c.remote_latency_ms ? `${c.remote_latency_ms}ms ${t("peerLatency")}` : `- ${t("peerLatency")}`;
-    return `<div class="chainPeer"><div><b>${esc(c.name || ("Entry " + shortHost(endpoint)))}</b><span>${esc(shortHost(endpoint))} · ${esc(latency)}</span></div><span class="chainPeerActions"><em>${c.status === "paired" ? t("paired") : esc(c.status || "-")}</em><button class="btn ghost" data-unpair-client="${esc(c.id)}">${t("unpair")}</button></span></div>`;
+    return `<div class="chainPeer"><div class="chainPeerMain"><b>${esc(c.name || ("Entry " + shortHost(endpoint)))}</b><span>${esc(shortHost(endpoint))}</span></div><div class="chainPeerMeta"><i>${esc(latency)}</i><em>${c.status === "paired" ? t("paired") : esc(c.status || "-")}</em></div><span class="chainPeerActions"><button class="btn ghost" data-unpair-client="${esc(c.id)}">${t("unpair")}</button></span></div>`;
   }).join("")}</div>`;
 }
 
