@@ -37,6 +37,13 @@ type Server struct {
 	static  embed.FS
 	mux     *http.ServeMux
 	upgrade upgradeState
+	build   BuildInfo
+}
+
+type BuildInfo struct {
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	BuiltAt string `json:"built_at"`
 }
 
 type upgradeState struct {
@@ -50,8 +57,8 @@ type upgradeState struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func New(st *store.Store, dataDir string, static embed.FS) *Server {
-	s := &Server{store: st, dataDir: dataDir, static: static, mux: http.NewServeMux()}
+func New(st *store.Store, dataDir string, static embed.FS, build BuildInfo) *Server {
+	s := &Server{store: st, dataDir: dataDir, static: static, mux: http.NewServeMux(), build: build}
 	_ = s.ensureRunnableNodes()
 	s.routes()
 	return s
@@ -75,6 +82,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/settings", s.auth(s.UpdateSettings))
 	s.mux.HandleFunc("/api/v1/system/upgrade", s.auth(s.Upgrade))
 	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
+	s.mux.HandleFunc("/api/v1/system/update-info", s.auth(s.UpdateInfo))
 	s.mux.HandleFunc("/api/v1/qrcode/subscribe", s.auth(s.SubscribeQRCode))
 	s.mux.HandleFunc("/api/v1/qrcode/node/", s.auth(s.NodeQRCode))
 	s.mux.HandleFunc("/api/v1/chain/public/status", s.ChainPublicStatus)
@@ -408,6 +416,78 @@ func (s *Server) UpgradeStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, st)
+}
+
+type updateInfo struct {
+	CurrentCommit   string       `json:"current_commit"`
+	LatestCommit    string       `json:"latest_commit,omitempty"`
+	UpdateAvailable bool         `json:"update_available"`
+	Notes           []updateNote `json:"notes,omitempty"`
+	Error           string       `json:"error,omitempty"`
+}
+
+type updateNote struct {
+	Commit  string `json:"commit"`
+	Message string `json:"message"`
+	Date    string `json:"date,omitempty"`
+}
+
+func (s *Server) UpdateInfo(w http.ResponseWriter, r *http.Request) {
+	info := updateInfo{CurrentCommit: s.build.Commit}
+	commits, err := fetchGitHubCommits()
+	if err != nil {
+		info.Error = err.Error()
+		writeJSON(w, http.StatusOK, info)
+		return
+	}
+	if len(commits) > 0 {
+		info.LatestCommit = commits[0].Commit
+		info.UpdateAvailable = s.build.Commit == "" || s.build.Commit == "dev" || !strings.HasPrefix(commits[0].Commit, s.build.Commit) && !strings.HasPrefix(s.build.Commit, commits[0].Commit)
+		for _, c := range commits {
+			if s.build.Commit != "" && s.build.Commit != "dev" && (strings.HasPrefix(c.Commit, s.build.Commit) || strings.HasPrefix(s.build.Commit, c.Commit)) {
+				break
+			}
+			info.Notes = append(info.Notes, c)
+			if len(info.Notes) >= 5 {
+				break
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, info)
+}
+
+func fetchGitHubCommits() ([]updateNote, error) {
+	client := http.Client{Timeout: 4 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/clover-eric/EasyNode/commits?sha=main&per_page=5")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("cannot check GitHub updates")
+	}
+	var data []struct {
+		SHA    string `json:"sha"`
+		Commit struct {
+			Message string `json:"message"`
+			Author  struct {
+				Date string `json:"date"`
+			} `json:"author"`
+		} `json:"commit"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+	notes := make([]updateNote, 0, len(data))
+	for _, c := range data {
+		msg := strings.Split(strings.TrimSpace(c.Commit.Message), "\n")[0]
+		sha := c.SHA
+		if len(sha) > 7 {
+			sha = sha[:7]
+		}
+		notes = append(notes, updateNote{Commit: sha, Message: msg, Date: c.Commit.Author.Date})
+	}
+	return notes, nil
 }
 
 func (s *Server) runUpgrade(backup string) {

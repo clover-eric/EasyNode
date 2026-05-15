@@ -11,6 +11,12 @@ import (
 	"easynode/internal/store"
 )
 
+var (
+	Version = "dev"
+	Commit  = "dev"
+	BuiltAt = ""
+)
+
 //go:embed dist dist/assets
 var static embed.FS
 
@@ -24,7 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	srv := api.New(st, *dataDir, static)
+	srv := api.New(st, *dataDir, static, api.BuildInfo{Version: Version, Commit: Commit, BuiltAt: BuiltAt})
 	go serveHTTPS(*tlsAddr, srv)
 	log.Printf("EasyNode listening on %s", *addr)
 	log.Fatal(http.ListenAndServe(*addr, srv.Handler()))

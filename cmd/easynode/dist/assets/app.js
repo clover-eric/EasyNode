@@ -107,6 +107,11 @@ const copyText = {
     upgradeDone: "升级完成，请刷新页面",
     upgradeDoneAction: "完成，返回首页",
     upgradeFailed: "升级失败",
+    updateAvailable: "发现新版本",
+    updateCurrent: "当前版本",
+    updateLatest: "最新版本",
+    updateNotes: "更新日记",
+    updateCheckFailed: "暂时无法检查更新",
     cancel: "取消",
     saved: "已保存",
     currentPasswordRequired: "请输入当前密码"
@@ -213,6 +218,11 @@ const copyText = {
     upgradeDone: "Upgrade complete. Refresh the page.",
     upgradeDoneAction: "Done, return home",
     upgradeFailed: "Upgrade failed",
+    updateAvailable: "New version available",
+    updateCurrent: "Current version",
+    updateLatest: "Latest version",
+    updateNotes: "Release notes",
+    updateCheckFailed: "Cannot check updates now",
     cancel: "Cancel",
     saved: "Saved",
     currentPasswordRequired: "Current password required"
@@ -511,6 +521,26 @@ function renderDashboard() {
       toast(e.message || t("unavailable"));
     }
   });
+  checkUpdateNotice();
+}
+
+async function checkUpdateNotice() {
+  try {
+    const info = await api("/api/v1/system/update-info");
+    if (!info.update_available) return;
+    const header = document.querySelector(".dashboardTop");
+    if (!header || document.querySelector(".updateNotice")) return;
+    const el = document.createElement("section");
+    el.className = "updateNotice";
+    el.innerHTML = `<div><b>${t("updateAvailable")}</b><span>${t("updateCurrent")}: ${info.current_commit || "dev"} · ${t("updateLatest")}: ${info.latest_commit || "-"}</span>${updateNotesHTML(info.notes || [])}</div><button class="btn primary" id="noticeUpgrade">${t("onlineUpgrade")}</button>`;
+    header.insertAdjacentElement("afterend", el);
+    $("#noticeUpgrade").onclick = showUpgradeConfirm;
+  } catch {}
+}
+
+function updateNotesHTML(notes) {
+  if (!notes.length) return "";
+  return `<ul class="updateNotes">${notes.map(n => `<li><span>${esc(n.commit || "")}</span>${esc(n.message || "")}</li>`).join("")}</ul>`;
 }
 
 function renderProtocolLibrary() {
@@ -578,7 +608,7 @@ function renderSettings() {
       </div>
     </div>
     <button class="btn primary big" id="saveSettings">${t("saveSettings")}</button>
-    <div class="notice">${t("upgradeTip")}</div>
+    <div class="notice updateBox" id="updateBox">${t("checking")}</div>
     <button class="btn big" id="upgradeBtn">${t("onlineUpgrade")}</button>
     <div id="settingsErr" class="error"></div>
   </div>`;
@@ -609,6 +639,19 @@ function renderSettings() {
   $("#upgradeBtn").onclick = async () => {
     showUpgradeConfirm();
   };
+  loadUpdateBox();
+}
+
+async function loadUpdateBox() {
+  const box = $("#updateBox");
+  if (!box) return;
+  try {
+    const info = await api("/api/v1/system/update-info");
+    const title = info.update_available ? t("updateAvailable") : t("upgradeTip");
+    box.innerHTML = `<b>${title}</b><span>${t("updateCurrent")}: ${info.current_commit || "dev"} · ${t("updateLatest")}: ${info.latest_commit || "-"}</span>${updateNotesHTML(info.notes || [])}${info.error ? `<span>${t("updateCheckFailed")}: ${esc(info.error)}</span>` : ""}`;
+  } catch (e) {
+    box.textContent = `${t("updateCheckFailed")}: ${e.message || ""}`;
+  }
 }
 
 function showUpgradeConfirm() {

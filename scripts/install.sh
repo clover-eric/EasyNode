@@ -279,7 +279,9 @@ build_from_source() {
   log "Cloning source from https://github.com/${GITHUB_REPO}.git"
   git clone --depth 1 "https://github.com/${GITHUB_REPO}.git" "$src"
   log "Building EasyNode from source"
-  (cd "$src" && HOME=/root GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" go build -o "$src/easynode" ./cmd/easynode)
+  commit="$(cd "$src" && git rev-parse --short HEAD 2>/dev/null || echo dev)"
+  built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  (cd "$src" && HOME=/root GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" go build -ldflags "-X main.Commit=$commit -X main.BuiltAt=$built_at" -o "$src/easynode" ./cmd/easynode)
   install -m 755 "$src/easynode" "$BIN"
   rm -rf "$src"
 }
