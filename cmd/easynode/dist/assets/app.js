@@ -439,7 +439,7 @@ function chainClientsSectionHTML() {
   if (!clients.length) return "";
   return `<div class="sectionTitle"><span>${t("pairedBy")}</span></div><div class="chainPeers">${clients.map(c => {
     const endpoint = c.endpoint || "-";
-    return `<div class="chainPeer"><div><b>${esc(c.name || ("Entry " + shortHost(endpoint)))}</b><span>${esc(shortHost(endpoint))}</span></div><span class="chainPeerActions"><em>${c.status === "paired" ? t("paired") : esc(c.status || "-")}</em></span></div>`;
+    return `<div class="chainPeer"><div><b>${esc(c.name || ("Entry " + shortHost(endpoint)))}</b><span>${esc(shortHost(endpoint))}</span></div><span class="chainPeerActions"><em>${c.status === "paired" ? t("paired") : esc(c.status || "-")}</em><button class="btn ghost" data-unpair-client="${esc(c.id)}">${t("unpair")}</button></span></div>`;
   }).join("")}</div>`;
 }
 
@@ -513,6 +513,15 @@ function renderDashboard() {
   document.querySelectorAll("[data-unpair]").forEach(b => b.onclick = async () => {
     try {
       state = await api("/api/v1/chain/remove", { method: "POST", body: JSON.stringify({ id: b.dataset.unpair }) });
+      toast(t("chainRemoved"));
+      renderDashboard();
+    } catch (e) {
+      toast(e.message);
+    }
+  });
+  document.querySelectorAll("[data-unpair-client]").forEach(b => b.onclick = async () => {
+    try {
+      state = await api("/api/v1/chain/client/remove", { method: "POST", body: JSON.stringify({ id: b.dataset.unpairClient }) });
       toast(t("chainRemoved"));
       renderDashboard();
     } catch (e) {

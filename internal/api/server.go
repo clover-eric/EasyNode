@@ -87,6 +87,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/qrcode/node/", s.auth(s.NodeQRCode))
 	s.mux.HandleFunc("/api/v1/chain/public/status", s.ChainPublicStatus)
 	s.mux.HandleFunc("/api/v1/chain/public/paired", s.ChainPublicPaired)
+	s.mux.HandleFunc("/api/v1/chain/public/unpaired", s.ChainPublicUnpaired)
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
 	s.mux.HandleFunc("/api/v1/nodes/add", s.auth(s.AddNode))
 	s.mux.HandleFunc("/api/v1/nodes/remove", s.auth(s.RemoveNode))
@@ -95,6 +96,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/chain/generate-code", s.auth(s.GenerateCode))
 	s.mux.HandleFunc("/api/v1/chain/pair", s.auth(s.Pair))
 	s.mux.HandleFunc("/api/v1/chain/remove", s.auth(s.RemoveChainPeer))
+	s.mux.HandleFunc("/api/v1/chain/client/remove", s.auth(s.RemoveChainClient))
 	s.mux.HandleFunc("/api/v1/chain/accepting", s.auth(s.SetChainAccepting))
 	s.mux.HandleFunc("/api/v1/sing-box/config", s.auth(s.SingBoxConfig))
 	s.mux.HandleFunc("/", s.Static)
@@ -285,7 +287,7 @@ func (s *Server) ChainPublicPaired(w http.ResponseWriter, r *http.Request) {
 		if !found {
 			return errors.New("pairing code invalid or expired")
 		}
-		upsertChainClient(st, model.ChainClient{ID: util.Token(6), Name: chainClientName(req.Endpoint), Endpoint: req.Endpoint, PublicKey: req.PublicKey, Status: "paired", CreatedAt: time.Now()})
+		upsertChainClient(st, model.ChainClient{ID: util.Token(6), Name: chainClientName(req.Endpoint), Endpoint: req.Endpoint, PublicKey: req.PublicKey, OutboundLink: req.OutboundLink, Status: "paired", CreatedAt: time.Now()})
 		return nil
 	})
 	if err != nil {
@@ -293,6 +295,46 @@ func (s *Server) ChainPublicPaired(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) ChainPublicUnpaired(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var req struct {
+		ExitEndpoint string `json:"exit_endpoint"`
+		Endpoint     string `json:"endpoint"`
+		PublicKey    string `json:"public_key"`
+		OutboundLink string `json:"outbound_link"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	removed := false
+	err := s.store.Update(func(st *model.AppState) error {
+		next := st.ChainPeers[:0]
+		for _, peer := range st.ChainPeers {
+			if chainPeerMatches(peer, "", req.PublicKey, req.OutboundLink) {
+				removed = true
+				continue
+			}
+			next = append(next, peer)
+		}
+		st.ChainPeers = next
+		return nil
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if removed {
+		st := s.store.Snapshot()
+		_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
+		_ = singbox.RestartService()
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true, "removed": removed})
 }
 
 func (s *Server) IPPurity(w http.ResponseWriter, r *http.Request) {
@@ -995,6 +1037,48 @@ func (s *Server) RemoveChainPeer(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, publicState(st))
 }
 
+func (s *Server) RemoveChainClient(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	var removed model.ChainClient
+	err := s.store.Update(func(st *model.AppState) error {
+		next := st.ChainClients[:0]
+		found := false
+		for _, client := range st.ChainClients {
+			if client.ID == req.ID {
+				removed = client
+				found = true
+				continue
+			}
+			next = append(next, client)
+		}
+		if !found {
+			return errors.New("chain client not found")
+		}
+		st.ChainClients = next
+		return nil
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	st := s.store.Snapshot()
+	notified, notifyErr := notifyEntryUnpaired(removed, chainSelfEndpoint(st))
+	resp := publicState(st)
+	out := withPanelURL(resp)
+	out["entry_notified"] = notified
+	if notifyErr != "" {
+		out["entry_notify_error"] = notifyErr
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (s *Server) SetChainAccepting(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		method(w)
@@ -1034,6 +1118,12 @@ func upsertChainPeer(st *model.AppState, peer model.ChainPeer) {
 	st.ChainPeers = append(st.ChainPeers, peer)
 }
 
+func chainPeerMatches(peer model.ChainPeer, endpoint, publicKey, outboundLink string) bool {
+	return (endpoint != "" && peer.Endpoint == endpoint) ||
+		(publicKey != "" && peer.PublicKey == publicKey) ||
+		(outboundLink != "" && peer.OutboundLink == outboundLink)
+}
+
 func upsertChainClient(st *model.AppState, client model.ChainClient) {
 	for i := range st.ChainClients {
 		if st.ChainClients[i].Endpoint == client.Endpoint || (client.PublicKey != "" && st.ChainClients[i].PublicKey == client.PublicKey) {
@@ -1071,6 +1161,39 @@ func notifyExitPaired(bundle chain.Bundle, endpoint, publicKey string) (bool, st
 		return false, "exit returned " + resp.Status
 	}
 	return true, ""
+}
+
+func notifyEntryUnpaired(client model.ChainClient, exitEndpoint string) (bool, string) {
+	u, err := url.Parse(client.Endpoint)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return false, "invalid entry endpoint"
+	}
+	u.Path = "/api/v1/chain/public/unpaired"
+	u.RawQuery = ""
+	body, _ := json.Marshal(map[string]string{"exit_endpoint": exitEndpoint, "endpoint": client.Endpoint, "public_key": client.PublicKey, "outbound_link": client.OutboundLink})
+	httpClient := http.Client{Timeout: 3 * time.Second}
+	resp, err := httpClient.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return false, err.Error()
+	}
+	if resp == nil {
+		return false, "empty response"
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return false, "entry returned " + resp.Status
+	}
+	return true, ""
+}
+
+func chainSelfEndpoint(st model.AppState) string {
+	if !st.IPDirect && st.Domain != "" && st.CertReady {
+		return "https://" + st.Domain + ":8443"
+	}
+	if st.Domain != "" {
+		return "http://" + st.Domain + ":8088"
+	}
+	return ""
 }
 
 func chainPeerName(displayName, endpoint string) string {
