@@ -383,10 +383,18 @@ function renderLogin() {
 
 function renderDashboard() {
   const sub = `${location.origin}/api/v1/subscribe/${state.subscribe_key}`;
+  const runningCount = state.nodes.filter(n => n.status === "running").length;
   app.innerHTML = `<main class="shell">
-    <header class="top">
-      <div class="brand"><div class="mark"><span></span></div><div><h1>EasyNode</h1><p>${state.domain || "IP direct"} · ${state.nodes.length} ${t("nodes")} · ${t("panelPath")} ${state.panel_path}</p></div></div>
-      <div class="actions">${langButton()}<button class="btn" id="purityBtn">${t("ipPurity")}</button><button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button><button class="btn" id="copySub">${t("copySub")}</button><button class="btn" id="subQR">${t("subQR")}</button><button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
+    <header class="top dashboardTop">
+      <div class="brandBlock">
+        <div class="brand"><div class="mark"><span></span></div><div><h1>EasyNode</h1><p>${state.domain || "IP direct"}</p></div></div>
+        <div class="topMeta"><span>${runningCount}/${state.nodes.length} ${t("running")}</span><span>${t("panelPath")} ${state.panel_path}</span></div>
+      </div>
+      <div class="actionPanel">
+        <div class="actionGroup primaryGroup"><button class="btn primary" id="copySub">${t("copySub")}</button><button class="btn" id="subQR">${t("subQR")}</button></div>
+        <div class="actionGroup"><button class="btn" id="purityBtn">${t("ipPurity")}</button><button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button></div>
+        <div class="actionGroup subtleGroup">${langButton()}<button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
+      </div>
     </header>
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
     <section class="split" style="margin-top:16px">
