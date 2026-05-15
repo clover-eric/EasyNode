@@ -47,7 +47,7 @@ EOF
 }
 
 STEP_NO=0
-TOTAL_STEPS=7
+TOTAL_STEPS=8
 step() {
   STEP_NO=$((STEP_NO + 1))
   printf '\n\033[1;36m[%d/%d]\033[0m \033[1m%s\033[0m\n' "$STEP_NO" "$TOTAL_STEPS" "$*"
@@ -138,7 +138,7 @@ pkg_update() {
 }
 
 pkg_deps() {
-  pkgs="curl ca-certificates tar gzip git make certbot"
+  pkgs="curl ca-certificates tar gzip git make certbot iptables"
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
     apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" $pkgs
@@ -213,6 +213,25 @@ install_binary() {
   fi
 
   build_from_source
+}
+
+setup_traffic_counters() {
+  if ! command -v iptables >/dev/null 2>&1; then
+    warn "iptables not found, skip traffic counters"
+    return
+  fi
+  iptables -N EASYNODE_TRAFFIC_IN 2>/dev/null || true
+  iptables -N EASYNODE_TRAFFIC_OUT 2>/dev/null || true
+  iptables -C INPUT -j EASYNODE_TRAFFIC_IN 2>/dev/null || iptables -I INPUT -j EASYNODE_TRAFFIC_IN
+  iptables -C OUTPUT -j EASYNODE_TRAFFIC_OUT 2>/dev/null || iptables -I OUTPUT -j EASYNODE_TRAFFIC_OUT
+  for port in 443 2053; do
+    iptables -C EASYNODE_TRAFFIC_IN -p tcp --dport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_IN -p tcp --dport "$port" -j RETURN
+    iptables -C EASYNODE_TRAFFIC_OUT -p tcp --sport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_OUT -p tcp --sport "$port" -j RETURN
+  done
+  for port in 8443 9443; do
+    iptables -C EASYNODE_TRAFFIC_IN -p udp --dport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_IN -p udp --dport "$port" -j RETURN
+    iptables -C EASYNODE_TRAFFIC_OUT -p udp --sport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_OUT -p udp --sport "$port" -j RETURN
+  done
 }
 
 install_go_if_missing() {
@@ -352,6 +371,8 @@ step "Installing EasyNode panel"
 install_binary
 step "Installing sing-box core"
 install_sing_box
+step "Preparing traffic counters"
+setup_traffic_counters
 step "Writing system services"
 write_service
 step "Checking panel health"

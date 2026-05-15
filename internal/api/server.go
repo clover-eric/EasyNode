@@ -22,6 +22,7 @@ import (
 	"easynode/internal/core/recommender"
 	"easynode/internal/core/singbox"
 	"easynode/internal/core/subscribe"
+	"easynode/internal/core/traffic"
 	"easynode/internal/model"
 	"easynode/internal/store"
 	"easynode/internal/util"
@@ -63,6 +64,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/login", s.Login)
 	s.mux.HandleFunc("/api/v1/logout", s.Logout)
 	s.mux.HandleFunc("/api/v1/state", s.auth(s.State))
+	s.mux.HandleFunc("/api/v1/ip/purity", s.auth(s.IPPurity))
 	s.mux.HandleFunc("/api/v1/settings", s.auth(s.UpdateSettings))
 	s.mux.HandleFunc("/api/v1/system/upgrade", s.auth(s.Upgrade))
 	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
@@ -209,7 +211,25 @@ func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) State(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, publicState(s.store.Snapshot()))
+	writeJSON(w, http.StatusOK, publicState(s.enrichedState()))
+}
+
+func (s *Server) IPPurity(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, detector.CheckPurity())
+}
+
+func (s *Server) enrichedState() model.AppState {
+	st := s.store.Snapshot()
+	bytesByPort := traffic.PortBytes()
+	for i := range st.Nodes {
+		st.Nodes[i].TrafficUsed = bytesByPort[st.Nodes[i].Port]
+		if st.Nodes[i].Status == "running" {
+			st.Nodes[i].LatencyMS = detector.LocalPortLatency(st.Nodes[i].Port, st.Nodes[i].Transport)
+		} else {
+			st.Nodes[i].LatencyMS = nil
+		}
+	}
+	return st
 }
 
 func (s *Server) Nodes(w http.ResponseWriter, r *http.Request) {

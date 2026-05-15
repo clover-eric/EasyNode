@@ -60,7 +60,11 @@ const copyText = {
     mainstreamClients: "主流客户端",
     latency: "延迟",
     port: "端口",
+    traffic: "流量",
     score: "推荐",
+    ipPurity: "IP 纯净度",
+    checking: "检测中...",
+    purityHint: "基于公开 IP 信誉信号的基础判断，仅作参考。",
     copyLink: "复制链接",
     showQR: "二维码",
     scanToImport: "扫码导入",
@@ -143,7 +147,11 @@ const copyText = {
     mainstreamClients: "mainstream clients",
     latency: "Latency",
     port: "Port",
+    traffic: "Traffic",
     score: "Score",
+    ipPurity: "IP purity",
+    checking: "Checking...",
+    purityHint: "Basic public IP reputation heuristic. For reference only.",
     copyLink: "Copy link",
     showQR: "QR code",
     scanToImport: "Scan to import",
@@ -364,7 +372,7 @@ function renderDashboard() {
   app.innerHTML = `<main class="shell">
     <header class="top">
       <div class="brand"><div class="mark"><span></span></div><div><h1>EasyNode</h1><p>${state.domain || "IP direct"} · ${state.nodes.length} ${t("nodes")} · ${t("panelPath")} ${state.panel_path}</p></div></div>
-      <div class="actions">${langButton()}<button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button><button class="btn" id="copySub">${t("copySub")}</button><button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
+      <div class="actions">${langButton()}<button class="btn" id="purityBtn">${t("ipPurity")}</button><button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button><button class="btn" id="copySub">${t("copySub")}</button><button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
     </header>
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
     <section class="split" style="margin-top:16px">
@@ -373,6 +381,7 @@ function renderDashboard() {
     </section>
   </main>`;
   $("#langBtn").onclick = switchLang;
+  $("#purityBtn").onclick = showPurity;
   $("#protocolsBtn").onclick = renderProtocolLibrary;
   $("#settingsBtn").onclick = renderSettings;
   $("#copySub").onclick = () => copy(sub, $("#copySub"));
@@ -575,9 +584,35 @@ function nodeCard(n) {
     <div class="cardHead"><div class="status"><i class="dot"></i>${n.status === "running" ? t("running") : t("stopped")}</div><span class="badge starBadge">${stars(p.score)}</span></div>
     <div class="proto">${p.title}</div><p class="desc">${p.summary}</p>
     <div class="miniInfo">${p.protocol} · ${p.clients || t("mainstreamClients")}</div>
-    <div class="stats"><div class="stat"><b>${n.latency_ms ?? "-"}ms</b><span>${t("latency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${p.score}</b><span>${t("score")}</span></div></div>
+    <div class="stats"><div class="stat"><b>${n.latency_ms ?? "-"}ms</b><span>${t("latency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${formatBytes(n.traffic_used || 0)}</b><span>${t("traffic")}</span></div></div>
     <div class="row">${copyButton}${qrButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
   </article>`;
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "0B";
+  const units = ["B", "K", "M", "G", "T"];
+  let n = bytes;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)}${units[i]}`;
+}
+
+async function showPurity() {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `<div class="dialog"><div class="dialogHead"><div><h2>${t("ipPurity")}</h2><p>${t("purityHint")}</p></div><button class="btn ghost" id="closePurity">${t("cancel")}</button></div><div class="notice" id="purityBody">${t("checking")}</div></div>`;
+  document.body.appendChild(modal);
+  $("#closePurity").onclick = () => modal.remove();
+  try {
+    const r = await api("/api/v1/ip/purity");
+    $("#purityBody").innerHTML = `<div class="purityScore">${r.score}<span>/100</span></div><p>${r.level || ""} · ${r.ip || ""}</p><p>${r.country || ""} ${r.asn || ""}</p><p>${r.isp || ""}</p><p>${(r.risks || []).join("<br>") || "No obvious risk flag"}</p>`;
+  } catch (e) {
+    $("#purityBody").textContent = e.message;
+  }
 }
 
 function showQR(text, title) {
