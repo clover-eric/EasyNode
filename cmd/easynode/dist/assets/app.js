@@ -330,6 +330,27 @@ function toast(text) {
   toastTimer = setTimeout(() => el.remove(), 2200);
 }
 
+function setButtonBusy(button, label) {
+  if (!button) return () => {};
+  const old = button.textContent;
+  button.dataset.busy = "true";
+  button.disabled = true;
+  button.classList.add("loading");
+  if (label) button.textContent = label;
+  return () => {
+    button.disabled = false;
+    button.classList.remove("loading");
+    delete button.dataset.busy;
+    button.textContent = old;
+  };
+}
+
+function markPending(el, className = "pending") {
+  if (!el) return () => {};
+  el.classList.add(className);
+  return () => el.classList.remove(className);
+}
+
 function protocolName(p) { return profile(p)?.protocol || p; }
 function supportsShadowrocket(n) {
   return /Shadowrocket/i.test(profile(n.protocol)?.clients || "");
@@ -578,16 +599,35 @@ function renderDashboard() {
   $("#downloadCfg").onclick = showSingBoxConfig;
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
   $("#togglePairing").onclick = async () => {
-    state = await api("/api/v1/chain/accepting", { method: "POST", body: JSON.stringify({ accepting: !!state.chain_pairing_disabled }) });
-    renderDashboard();
+    const done = setButtonBusy($("#togglePairing"), t("checking"));
+    const unmark = markPending($(".chainCard"));
+    try {
+      state = await api("/api/v1/chain/accepting", { method: "POST", body: JSON.stringify({ accepting: !!state.chain_pairing_disabled }) });
+      renderDashboard();
+    } catch (e) {
+      toast(e.message);
+      done();
+      unmark();
+    }
   };
   $("#genCode").onclick = async () => {
-    const code = await api("/api/v1/chain/generate-code", { method: "POST", body: JSON.stringify({ endpoint: $("#genEndpoint").value || location.origin }) });
-    const token = code.bundle || code.code;
-    $("#codeBox").innerHTML = `<b>${t("pairingCode")}</b><textarea class="copyBox" id="pairTokenBox" readonly>${token}</textarea><div class="row"><button class="btn primary" id="copyPairToken">${t("copyLink")}</button><span class="chainExpire">${new Date(code.expires_at).toLocaleString()} ${t("expired")}</span></div>`;
-    $("#copyPairToken").onclick = () => copy(token, $("#copyPairToken"));
+    const done = setButtonBusy($("#genCode"), t("checking"));
+    const unmark = markPending($("#codeBox"));
+    try {
+      const code = await api("/api/v1/chain/generate-code", { method: "POST", body: JSON.stringify({ endpoint: $("#genEndpoint").value || location.origin }) });
+      const token = code.bundle || code.code;
+      $("#codeBox").innerHTML = `<b>${t("pairingCode")}</b><textarea class="copyBox" id="pairTokenBox" readonly>${token}</textarea><div class="row"><button class="btn primary" id="copyPairToken">${t("copyLink")}</button><span class="chainExpire">${new Date(code.expires_at).toLocaleString()} ${t("expired")}</span></div>`;
+      $("#copyPairToken").onclick = () => copy(token, $("#copyPairToken"));
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      done();
+      unmark();
+    }
   };
   $("#pairBtn").onclick = async () => {
+    const done = setButtonBusy($("#pairBtn"), t("checking"));
+    const unmark = markPending($("#pairBtn").closest(".chainCard"));
     try {
       const pairResult = await api("/api/v1/chain/pair", { method: "POST", body: JSON.stringify({ code: $("#pairCode").value.trim(), my_endpoint: $("#pairEndpoint").value || location.origin, my_public_key: crypto.randomUUID(), display_name: "" }) });
       state = await api("/api/v1/state");
@@ -595,24 +635,34 @@ function renderDashboard() {
       renderDashboard();
     } catch (e) {
       toast(e.message);
+      done();
+      unmark();
     }
   };
   document.querySelectorAll("[data-unpair]").forEach(b => b.onclick = async () => {
+    const done = setButtonBusy(b, t("checking"));
+    const unmark = markPending(b.closest(".chainPeer"), "removing");
     try {
       state = await api("/api/v1/chain/remove", { method: "POST", body: JSON.stringify({ id: b.dataset.unpair }) });
       toast(t("chainRemoved"));
       renderDashboard();
     } catch (e) {
       toast(e.message);
+      done();
+      unmark();
     }
   });
   document.querySelectorAll("[data-unpair-client]").forEach(b => b.onclick = async () => {
+    const done = setButtonBusy(b, t("checking"));
+    const unmark = markPending(b.closest(".chainPeer"), "removing");
     try {
       state = await api("/api/v1/chain/client/remove", { method: "POST", body: JSON.stringify({ id: b.dataset.unpairClient }) });
       toast(t("chainRemoved"));
       renderDashboard();
     } catch (e) {
       toast(e.message);
+      done();
+      unmark();
     }
   });
   document.querySelectorAll("[data-node-copy]").forEach(b => b.onclick = () => {
@@ -630,12 +680,17 @@ function renderDashboard() {
     location.href = shadowrocketImportURL(n.subscribe_link);
   });
   document.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => {
+    const card = b.closest(".card");
+    const done = setButtonBusy(b, t("checking"));
+    const unmark = markPending(card, "switching");
     try {
       state.nodes = await api(`/api/v1/nodes/${b.dataset.toggle}/toggle`, { method: "POST" });
       state = await api("/api/v1/state");
       renderDashboard();
     } catch (e) {
       toast(e.message || t("unavailable"));
+      done();
+      unmark();
     }
   });
   checkUpdateNotice();
@@ -701,27 +756,37 @@ function renderProtocolLibrary() {
   document.body.appendChild(modal);
   $("#closeProtocols").onclick = () => modal.remove();
   modal.querySelectorAll("[data-add-protocol]").forEach(btn => btn.onclick = async () => {
-    btn.disabled = true;
+    const done = setButtonBusy(btn, t("checking"));
+    const card = btn.closest(".protocolOption");
+    const unmark = markPending(card, "adding");
     try {
       state = await api("/api/v1/nodes/add", { method: "POST", body: JSON.stringify({ protocol: btn.dataset.addProtocol }) });
       toast(t("addSuccess"));
+      card?.classList.add("done");
+      await new Promise(resolve => setTimeout(resolve, 180));
       modal.remove();
       renderDashboard();
     } catch (e) {
       toast(e.message);
-      btn.disabled = false;
+      done();
+      unmark();
     }
   });
   modal.querySelectorAll("[data-remove-protocol]").forEach(btn => btn.onclick = async () => {
-    btn.disabled = true;
+    const done = setButtonBusy(btn, t("checking"));
+    const card = btn.closest(".protocolOption");
+    const unmark = markPending(card, "removing");
     try {
       state = await api("/api/v1/nodes/remove", { method: "POST", body: JSON.stringify({ protocol: btn.dataset.removeProtocol }) });
       toast(t("removeSuccess"));
+      card?.classList.add("done");
+      await new Promise(resolve => setTimeout(resolve, 180));
       modal.remove();
       renderDashboard();
     } catch (e) {
       toast(e.message);
-      btn.disabled = false;
+      done();
+      unmark();
     }
   });
 }
