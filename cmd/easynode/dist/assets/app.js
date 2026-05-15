@@ -693,6 +693,10 @@ const purityI18n = {
     "data center / hosting ASN": "机房或托管 ASN",
     "proxy/VPN risk flag": "存在代理 / VPN 风险标记",
     "provider name looks like hosting": "服务商名称疑似机房",
+    "location database conflict": "不同定位数据库结果不一致",
+    "multi-source match": "多源一致",
+    "source conflict": "来源冲突",
+    "single source": "单一来源",
     "reputation API unreachable": "纯净度接口暂时不可达",
     "reputation API returned no result": "纯净度接口没有返回结果",
     "AI / ChatGPT": "AI / ChatGPT",
@@ -731,6 +735,11 @@ function countryName(name) {
 function flagEmoji(code) {
   if (!code || code.length !== 2) return "";
   return code.toUpperCase().replace(/./g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+
+function locationSourcesHTML(sources) {
+  if (!sources.length) return "";
+  return `<span class="geoSources">${sources.map(s => `<i>${esc(s.source)}: ${flagEmoji(s.country_code)} ${esc(countryName(s.country))}${s.asn ? " · " + esc(s.asn) : ""}</i>`).join("")}</span>`;
 }
 
 function nodeCard(n) {
@@ -773,6 +782,7 @@ async function showPurity() {
       <div class="purityMain"><div class="purityScore">${r.score}<span>/100</span></div><p>${pt(r.level || "")} · ${r.ip || ""}</p><p><span class="flag">${flagEmoji(r.country_code)}</span>${countryName(r.country)} ${r.asn || ""}</p><p>${r.isp || ""}</p></div>
       <div class="purityMeta"><b>${t("ipType")}</b><span>${pt(r.ip_type || "-")}</span></div>
       <div class="purityMeta"><b>${t("nativeCheck")}</b><span>${pt(r.native || "-")}</span></div>
+      <div class="purityMeta wide"><b>定位来源</b><span>${pt(r.location_confidence || "")}${locationSourcesHTML(r.location_sources || [])}</span></div>
       <div class="purityMeta wide"><b>${t("risks")}</b><span>${(r.risks || []).map(pt).join("<br>") || pt("No obvious risk flag")}</span></div>
       <div class="purityMeta wide"><b>${t("useCases")}</b>${(r.use_cases || []).map(x => `<span>${pt(x.name)}: ${pt(x.status)} - ${pt(x.reason)}</span>`).join("")}</div>
     </div>`;
