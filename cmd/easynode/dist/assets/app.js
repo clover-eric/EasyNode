@@ -12,6 +12,8 @@ const copyText = {
     setupHintText: "系统会同时生成“稳、快、兼容”的节点。客户端里复制订阅即可使用。",
     adminPassword: "管理员密码",
     passwordPlaceholder: "至少 8 位",
+    passwordTooShort: "管理员密码至少需要 8 位",
+    domainRequired: "请输入域名，或切换到 IP 直连模式",
     panelPath: "面板路径",
     domain: "你的域名",
     ipDirect: "我暂时没有域名，先用 IP 直连",
@@ -131,6 +133,8 @@ const copyText = {
     setupHintText: "EasyNode creates stable, fast, and compatible nodes. Copy the subscription into your client to use them.",
     adminPassword: "Admin password",
     passwordPlaceholder: "At least 8 characters",
+    passwordTooShort: "Admin password must be at least 8 characters",
+    domainRequired: "Enter a domain, or switch to IP direct mode",
     panelPath: "Panel path",
     domain: "Your domain",
     ipDirect: "No domain yet, use IP direct mode",
@@ -274,9 +278,16 @@ async function api(path, opts = {}) {
   if (!res.ok) {
     let msg = t("requestFailed");
     try { msg = (await res.json()).error || msg; } catch {}
+    msg = localizeError(msg);
     throw new Error(msg);
   }
   return res.json();
+}
+
+function localizeError(msg) {
+  if (msg === "password must be at least 8 characters") return t("passwordTooShort");
+  if (msg === "domain required unless IP direct mode enabled") return t("domainRequired");
+  return msg;
 }
 
 function switchLang() {
@@ -324,7 +335,7 @@ function renderSetup(setup) {
     <div class="setupHint"><b>${t("setupHintTitle")}</b><span>${t("setupHintText")}</span></div>
     <div class="steps">
       <div>
-        <div class="field"><label>${t("adminPassword")}</label><input id="password" type="password" minlength="8" placeholder="${t("passwordPlaceholder")}"></div>
+        <div class="field"><label>${t("adminPassword")}</label><input id="password" type="password" minlength="8" placeholder="${t("passwordPlaceholder")}"><div id="passwordErr" class="fieldError"></div></div>
         <div class="field"><label>${t("panelPath")}</label><input id="panelPath" value="${setup.panel_path}"></div>
       </div>
       <div>
@@ -338,9 +349,9 @@ function renderSetup(setup) {
     </div>
     <div class="sectionTitle"><span>${t("nodePlan")}</span><button class="btn ghost" id="selectRecommended">${t("restoreRecommended")}</button></div>
     <div class="protocolGrid">${allProfiles().map(([id, p]) => protocolOption(id, p)).join("")}</div>
+    <div id="err" class="error setupError" hidden></div>
     <button class="btn primary big" id="setupBtn">${t("setupButton")}</button>
     <div class="notice">${t("setupNotice")}</div>
-    <div id="err" class="error"></div>
   </section></main>`;
   $("#langBtn").onclick = switchLang;
   $("#selectRecommended").onclick = () => {
@@ -350,6 +361,20 @@ function renderSetup(setup) {
   $("#ipMode").onclick = () => setIPMode(true);
   applyProtocolAvailability();
   $("#setupBtn").onclick = async () => {
+    $("#passwordErr").textContent = "";
+    $("#err").hidden = true;
+    $("#err").textContent = "";
+    if ($("#password").value.length < 8) {
+      $("#passwordErr").textContent = t("passwordTooShort");
+      $("#password").focus();
+      return;
+    }
+    if (!$("#ipDirect").checked && !$("#domain").value.trim()) {
+      $("#err").textContent = t("domainRequired");
+      $("#err").hidden = false;
+      $("#domain").focus();
+      return;
+    }
     $("#setupBtn").disabled = true;
     $("#setupBtn").textContent = t("deploying");
     try {
@@ -368,6 +393,7 @@ function renderSetup(setup) {
       renderDashboard();
     } catch (e) {
       $("#err").textContent = e.message;
+      $("#err").hidden = false;
       $("#setupBtn").disabled = false;
       $("#setupBtn").textContent = t("setupButton");
     }
