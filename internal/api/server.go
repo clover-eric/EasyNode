@@ -299,7 +299,8 @@ func (s *Server) runUpgrade(backup string) {
 		_ = os.WriteFile(filepath.Join(backup, "state.json"), b, 0600)
 	}
 	s.setUpgrade(35, "downloading installer", "", "", backup, true)
-	cmd := exec.Command("systemd-run", "--unit=easynode-upgrade", "--collect", "bash", "-lc", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
+	_ = exec.Command("systemctl", "reset-failed", "easynode-upgrade").Run()
+	cmd := exec.Command("systemd-run", "--unit=easynode-upgrade", "bash", "-lc", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		s.setUpgrade(100, "upgrade failed", string(out), err.Error(), backup, false)
@@ -315,11 +316,33 @@ func (s *Server) runUpgrade(backup string) {
 		}
 	}
 	statusOut, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "120", "--no-pager").CombinedOutput()
+	result, code := upgradeUnitResult()
+	if result != "success" || code != "0" {
+		s.setUpgrade(100, "upgrade failed", string(statusOut), "upgrade task failed: result="+result+" status="+code, backup, false)
+		return
+	}
 	s.setUpgrade(100, "upgrade complete, refreshing panel", string(statusOut), "", backup, false)
 }
 
 func upgradeUnitActive() bool {
 	return exec.Command("systemctl", "is-active", "--quiet", "easynode-upgrade").Run() == nil
+}
+
+func upgradeUnitResult() (string, string) {
+	out, err := exec.Command("systemctl", "show", "easynode-upgrade", "-p", "Result", "-p", "ExecMainStatus", "--value").CombinedOutput()
+	if err != nil {
+		return "unknown", "unknown"
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	result := "unknown"
+	code := "unknown"
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) != "" {
+		result = strings.TrimSpace(lines[0])
+	}
+	if len(lines) > 1 && strings.TrimSpace(lines[1]) != "" {
+		code = strings.TrimSpace(lines[1])
+	}
+	return result, code
 }
 
 func (s *Server) setUpgrade(progress int, step, output, errText, backup string, running bool) {

@@ -82,6 +82,7 @@ const copyText = {
     upgradeStarted: "升级已执行，请稍后刷新页面",
     upgrading: "正在升级",
     upgradeDone: "升级完成，请刷新页面",
+    upgradeDoneAction: "完成，返回首页",
     upgradeFailed: "升级失败",
     cancel: "取消",
     saved: "已保存",
@@ -164,6 +165,7 @@ const copyText = {
     upgradeStarted: "Upgrade executed. Refresh the page later.",
     upgrading: "Upgrading",
     upgradeDone: "Upgrade complete. Refresh the page.",
+    upgradeDoneAction: "Done, return home",
     upgradeFailed: "Upgrade failed",
     cancel: "Cancel",
     saved: "Saved",
@@ -530,6 +532,7 @@ function showUpgradeModal() {
     <div class="progressWrap"><div class="progressBar" id="upgradeBar" style="width:5%"></div></div>
     <div class="notice" id="upgradeStep">Preparing...</div>
     <pre class="upgradeLog" id="upgradeLog"></pre>
+    <button class="btn primary big upgradeDoneBtn" id="upgradeDoneBtn" style="display:none">${t("upgradeDoneAction")}</button>
   </div>`;
   document.body.appendChild(modal);
   $("#closeUpgrade").onclick = () => modal.remove();
@@ -544,6 +547,11 @@ async function pollUpgrade() {
     if (bar) bar.style.width = `${Math.max(5, st.progress || 5)}%`;
     if (step) step.textContent = st.error ? `${t("upgradeFailed")}: ${st.error}` : (st.progress >= 100 ? t("upgradeDone") : st.step);
     if (log && st.output) log.textContent = stripAnsi(st.output).slice(-4000);
+    const doneBtn = $("#upgradeDoneBtn");
+    if (doneBtn && st.progress >= 100 && !st.running && !st.error) {
+      doneBtn.style.display = "block";
+      doneBtn.onclick = () => { location.href = "/"; };
+    }
     if (st.running) {
       setTimeout(pollUpgrade, 1500);
     }
