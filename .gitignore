@@ -18,3 +18,10 @@ Thumbs.db
 # Go
 *.test
 coverage.out
+
+# Repo guidance / agent artifacts
+prompt.md
+AGENTS.md
+.agents/
+*prompt*
+*agent*
