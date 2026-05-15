@@ -86,6 +86,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/qrcode/subscribe", s.auth(s.SubscribeQRCode))
 	s.mux.HandleFunc("/api/v1/qrcode/node/", s.auth(s.NodeQRCode))
 	s.mux.HandleFunc("/api/v1/chain/public/status", s.ChainPublicStatus)
+	s.mux.HandleFunc("/api/v1/chain/public/paired", s.ChainPublicPaired)
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
 	s.mux.HandleFunc("/api/v1/nodes/add", s.auth(s.AddNode))
 	s.mux.HandleFunc("/api/v1/nodes/remove", s.auth(s.RemoveNode))
@@ -244,6 +245,45 @@ func (s *Server) ChainPublicStatus(w http.ResponseWriter, r *http.Request) {
 		"domain":           st.Domain,
 		"updated_at":       st.UpdatedAt,
 	})
+}
+
+func (s *Server) ChainPublicPaired(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var req struct {
+		Code      string `json:"code"`
+		Endpoint  string `json:"endpoint"`
+		PublicKey string `json:"public_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	err := s.store.Update(func(st *model.AppState) error {
+		if st.ChainPairingDisabled {
+			return errors.New("chain pairing is disabled on this server")
+		}
+		found := false
+		for i := range st.PairingCodes {
+			if st.PairingCodes[i].Code == req.Code && st.PairingCodes[i].ExpiresAt.After(time.Now()) {
+				st.PairingCodes[i].Used = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.New("pairing code invalid or expired")
+		}
+		upsertChainClient(st, model.ChainClient{ID: util.Token(6), Name: chainClientName(req.Endpoint), Endpoint: req.Endpoint, PublicKey: req.PublicKey, Status: "paired", CreatedAt: time.Now()})
+		return nil
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (s *Server) IPPurity(w http.ResponseWriter, r *http.Request) {
@@ -867,6 +907,7 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		st := s.store.Snapshot()
 		_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 		_ = singbox.RestartService()
+		go notifyExitPaired(bundle, req.Endpoint, req.PublicKey)
 		writeJSON(w, http.StatusOK, map[string]any{"peer_public_key": bundle.PublicKey, "peer_endpoint": bundle.Endpoint, "tunnel_config": bundle})
 		return
 	}
@@ -967,6 +1008,37 @@ func upsertChainPeer(st *model.AppState, peer model.ChainPeer) {
 	st.ChainPeers = append(st.ChainPeers, peer)
 }
 
+func upsertChainClient(st *model.AppState, client model.ChainClient) {
+	for i := range st.ChainClients {
+		if st.ChainClients[i].Endpoint == client.Endpoint || (client.PublicKey != "" && st.ChainClients[i].PublicKey == client.PublicKey) {
+			if st.ChainClients[i].ID != "" {
+				client.ID = st.ChainClients[i].ID
+			}
+			if !st.ChainClients[i].CreatedAt.IsZero() {
+				client.CreatedAt = st.ChainClients[i].CreatedAt
+			}
+			st.ChainClients[i] = client
+			return
+		}
+	}
+	st.ChainClients = append(st.ChainClients, client)
+}
+
+func notifyExitPaired(bundle chain.Bundle, endpoint, publicKey string) {
+	u, err := url.Parse(bundle.Endpoint)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return
+	}
+	u.Path = "/api/v1/chain/public/paired"
+	u.RawQuery = ""
+	body, _ := json.Marshal(map[string]string{"code": bundle.Code, "endpoint": endpoint, "public_key": publicKey})
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err == nil && resp != nil {
+		_ = resp.Body.Close()
+	}
+}
+
 func chainPeerName(displayName, endpoint string) string {
 	if displayName != "" && len(displayName) <= 40 && !strings.HasPrefix(displayName, "Exit ENPAIR-") {
 		return displayName
@@ -978,6 +1050,16 @@ func chainPeerName(displayName, endpoint string) string {
 		return "Exit " + endpoint
 	}
 	return "Chain exit"
+}
+
+func chainClientName(endpoint string) string {
+	if u, err := url.Parse(endpoint); err == nil && u.Hostname() != "" {
+		return "Entry " + u.Hostname()
+	}
+	if endpoint != "" && len(endpoint) <= 40 {
+		return "Entry " + endpoint
+	}
+	return "Entry server"
 }
 
 func firstRunningLink(nodes []model.Node) string {
