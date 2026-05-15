@@ -45,6 +45,10 @@ const copyText = {
     removeSuccess: "协议已移除",
     addSuccess: "协议已添加",
     config: "sing-box 配置",
+    configTitle: "sing-box 配置",
+    configText: "当前服务正在使用的 sing-box JSON 配置。",
+    copyConfig: "复制配置",
+    downloadConfig: "下载配置",
     logout: "退出",
     chainProxy: "链式代理",
     chainText: "落地服务器生成配对码，入口服务器填入后建立出口配置。",
@@ -147,6 +151,10 @@ const copyText = {
     removeSuccess: "Protocol removed",
     addSuccess: "Protocol added",
     config: "sing-box config",
+    configTitle: "sing-box config",
+    configText: "Current sing-box JSON config used by this server.",
+    copyConfig: "Copy config",
+    downloadConfig: "Download config",
     logout: "Log out",
     chainProxy: "Chain proxy",
     chainText: "Generate a pairing code on the exit server, then enter it on the entry server.",
@@ -455,7 +463,7 @@ function renderDashboard() {
   $("#settingsBtn").onclick = renderSettings;
   $("#copySub").onclick = () => copy(sub, $("#copySub"));
   $("#subQR").onclick = () => showQR(sub, t("subQR"), "/api/v1/qrcode/subscribe");
-  $("#downloadCfg").onclick = () => location.href = "/api/v1/sing-box/config";
+  $("#downloadCfg").onclick = showSingBoxConfig;
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
   $("#togglePairing").onclick = async () => {
     state = await api("/api/v1/chain/accepting", { method: "POST", body: JSON.stringify({ accepting: !!state.chain_pairing_disabled }) });
@@ -791,6 +799,32 @@ function showQR(text, title, imageURL) {
     const loading = modal.querySelector(".qrLoading");
     if (loading) loading.remove();
   };
+}
+
+async function showSingBoxConfig() {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `<div class="dialog configDialog">
+    <div class="dialogHead"><div><h2>${t("configTitle")}</h2><p>${t("configText")}</p></div><button class="btn ghost" id="closeConfig">${t("cancel")}</button></div>
+    <div class="configToolbar"><button class="btn primary" id="copyConfigBtn">${t("copyConfig")}</button><button class="btn" id="downloadConfigBtn">${t("downloadConfig")}</button></div>
+    <pre class="configViewer" id="configViewer">${t("checking")}</pre>
+  </div>`;
+  document.body.appendChild(modal);
+  $("#closeConfig").onclick = () => modal.remove();
+  try {
+    const res = await fetch("/api/v1/sing-box/config", { credentials: "include" });
+    if (!res.ok) throw new Error(await res.text());
+    const raw = await res.text();
+    let pretty = raw;
+    try {
+      pretty = JSON.stringify(JSON.parse(raw), null, 2);
+    } catch {}
+    $("#configViewer").textContent = pretty;
+    $("#copyConfigBtn").onclick = () => copy(pretty, $("#copyConfigBtn"));
+    $("#downloadConfigBtn").onclick = () => location.href = "/api/v1/sing-box/config";
+  } catch (e) {
+    $("#configViewer").textContent = e.message || t("requestFailed");
+  }
 }
 
 async function copy(text, button) {
