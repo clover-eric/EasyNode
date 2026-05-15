@@ -31,6 +31,8 @@ const copyText = {
     setupNotice: "不知道怎么选就保留默认：日常首选 + 高速传输 + 兼容优先。高级方案可以以后再开。",
     loginIntro: "输入管理员密码进入面板。",
     loggingIn: "正在进入...",
+    loadingTitle: "载入中",
+    loadingText: "正在准备面板",
     invalidPassword: "密码错误，请重新输入",
     tooManyLoginAttempts: "密码错误次数过多，请稍后再试",
     securePanel: "安全面板",
@@ -156,6 +158,8 @@ const copyText = {
     setupNotice: "Not sure what to choose? Keep the defaults: Daily, Speed, and Compatibility. Advanced plans can be enabled later.",
     loginIntro: "Enter admin password to open the panel.",
     loggingIn: "Opening...",
+    loadingTitle: "Loading",
+    loadingText: "Preparing panel",
     invalidPassword: "Invalid password. Please try again.",
     tooManyLoginAttempts: "Too many login attempts. Try again later.",
     securePanel: "Secure panel",
@@ -303,7 +307,7 @@ function localizeError(msg) {
 function switchLang() {
   lang = lang === "zh" ? "en" : "zh";
   localStorage.setItem("easynode_lang", lang);
-  boot();
+  boot(false);
 }
 
 function langButton() {
@@ -334,7 +338,19 @@ function stars(score) {
   return `<span class="stars" aria-label="${score}">${"★".repeat(n)}${"☆".repeat(5 - n)}</span>`;
 }
 
-async function boot() {
+function renderLoading() {
+  app.innerHTML = `<main class="shell bootShell"><section class="bootCard"><div class="brand"><div class="mark large"><span></span></div><div><h1>EasyNode</h1><p>${t("setupIntro")}</p></div></div><div class="bootBody"><div class="bootSpinner"></div><div><b>${t("loadingTitle")}</b><span>${t("loadingText")}</span></div></div></section></main>`;
+}
+
+function registerPWA() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
+
+async function boot(showLoading = false) {
+  if (showLoading) renderLoading();
   const setup = await api("/api/v1/setup/status");
   if (!setup.setup_done) return renderSetup(setup);
   try {
@@ -1082,6 +1098,8 @@ function showCopyFallback(text) {
   box.select();
 }
 
-boot().catch(e => {
+renderLoading();
+registerPWA();
+boot(true).catch(e => {
   app.innerHTML = `<main class="shell"><section class="panel"><h1>EasyNode</h1><p>${e.message}</p></section></main>`;
 });

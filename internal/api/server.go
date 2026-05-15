@@ -1283,7 +1283,7 @@ func (s *Server) SingBoxConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Static(w http.ResponseWriter, r *http.Request) {
 	st := s.store.Snapshot()
-	if st.SetupDone && st.PanelPath != "" && r.URL.Path != "/" && !strings.HasPrefix(r.URL.Path, st.PanelPath) && !strings.HasPrefix(r.URL.Path, "/assets/") {
+	if st.SetupDone && st.PanelPath != "" && r.URL.Path != "/" && !strings.HasPrefix(r.URL.Path, st.PanelPath) && !publicStaticPath(r.URL.Path) {
 		http.NotFound(w, r)
 		return
 	}
@@ -1309,7 +1309,23 @@ func (s *Server) Static(w http.ResponseWriter, r *http.Request) {
 	if typ := mime.TypeByExtension(filepath.Ext(path)); typ != "" {
 		w.Header().Set("Content-Type", typ)
 	}
+	if path == "manifest.webmanifest" {
+		w.Header().Set("Content-Type", "application/manifest+json; charset=utf-8")
+	}
+	if strings.HasPrefix(path, "assets/") || path == "favicon.svg" || path == "apple-touch-icon.png" {
+		w.Header().Set("Cache-Control", "public, max-age=604800")
+	} else if path == "sw.js" {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
 	http.ServeContent(w, r, path, time.Time{}, bytes.NewReader(b))
+}
+
+func publicStaticPath(path string) bool {
+	return strings.HasPrefix(path, "/assets/") ||
+		path == "/manifest.webmanifest" ||
+		path == "/sw.js" ||
+		path == "/favicon.svg" ||
+		path == "/apple-touch-icon.png"
 }
 
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
