@@ -397,9 +397,9 @@ function renderDashboard() {
       </div>
     </header>
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
-    <section class="split" style="margin-top:16px">
-      <div class="card"><div class="proto">${t("chainProxy")}</div><p>${t("chainText")}</p><div class="row" style="margin-top:14px"><input id="genEndpoint" placeholder="${t("endpointPlaceholder")}"><button class="btn primary" id="genCode">${t("generateCode")}</button></div><div id="codeBox" class="notice"></div></div>
-      <div class="card"><div class="proto">${t("addExit")}</div><p>${t("addExitText")}</p><div class="field"><label>${t("pairingCode")}</label><input id="pairCode" placeholder="A3X-K9M"></div><div class="field"><label>${t("myEndpoint")}</label><input id="pairEndpoint" placeholder="${location.origin}"></div><button class="btn primary" id="pairBtn">${t("pairDoneButton")}</button><div class="notice">${(state.chain_peers || []).map(p => `${p.name} · ${p.status}`).join("<br>") || t("noPeers")}</div></div>
+    <section class="split chainGrid" style="margin-top:16px">
+      <div class="card chainCard"><div class="proto">${t("chainProxy")}</div><p>${t("chainText")}</p><div class="row chainRow" style="margin-top:14px"><input id="genEndpoint" placeholder="${t("endpointPlaceholder")}" value="${location.origin}"><button class="btn primary" id="genCode">${t("generateCode")}</button></div><div id="codeBox" class="notice chainNotice">1. 在落地服务器生成配对令牌。2. 到入口服务器粘贴令牌并完成配对。</div></div>
+      <div class="card chainCard"><div class="proto">${t("addExit")}</div><p>${t("addExitText")}</p><div class="field"><label>${t("pairingCode")}</label><textarea class="copyBox chainTokenInput" id="pairCode" placeholder="ENPAIR-..."></textarea></div><div class="field"><label>${t("myEndpoint")}</label><input id="pairEndpoint" placeholder="${location.origin}" value="${location.origin}"></div><button class="btn primary" id="pairBtn">${t("pairDoneButton")}</button><div class="notice">${(state.chain_peers || []).map(p => `${p.name} · ${p.status} · ${p.endpoint || "-"}`).join("<br>") || t("noPeers")}</div></div>
     </section>
   </main>`;
   $("#langBtn").onclick = switchLang;
@@ -412,7 +412,9 @@ function renderDashboard() {
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
   $("#genCode").onclick = async () => {
     const code = await api("/api/v1/chain/generate-code", { method: "POST", body: JSON.stringify({ endpoint: $("#genEndpoint").value || location.origin }) });
-    $("#codeBox").textContent = `${code.code} · ${new Date(code.expires_at).toLocaleString()} ${t("expired")}`;
+    const token = code.bundle || code.code;
+    $("#codeBox").innerHTML = `<b>${t("pairingCode")}</b><textarea class="copyBox" id="pairTokenBox" readonly>${token}</textarea><div class="row"><button class="btn primary" id="copyPairToken">${t("copyLink")}</button><span class="chainExpire">${new Date(code.expires_at).toLocaleString()} ${t("expired")}</span></div>`;
+    $("#copyPairToken").onclick = () => copy(token, $("#copyPairToken"));
   };
   $("#pairBtn").onclick = async () => {
     try {

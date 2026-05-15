@@ -68,18 +68,21 @@ type Environment struct {
 }
 
 type ChainPeer struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Endpoint  string    `json:"endpoint"`
-	PublicKey string    `json:"public_key"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Endpoint     string    `json:"endpoint"`
+	PublicKey    string    `json:"public_key"`
+	OutboundLink string    `json:"outbound_link,omitempty"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type PairingCode struct {
-	Code      string    `json:"code"`
-	Endpoint  string    `json:"endpoint"`
-	PublicKey string    `json:"public_key"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Used      bool      `json:"used"`
+	Code         string    `json:"code"`
+	Endpoint     string    `json:"endpoint"`
+	PublicKey    string    `json:"public_key"`
+	OutboundLink string    `json:"outbound_link,omitempty"`
+	Bundle       string    `json:"bundle,omitempty"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	Used         bool      `json:"used"`
 }

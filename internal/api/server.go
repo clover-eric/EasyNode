@@ -688,7 +688,13 @@ func (s *Server) GenerateCode(w http.ResponseWriter, r *http.Request) {
 		Endpoint string `json:"endpoint"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
-	code := chain.NewCode(req.Endpoint)
+	st := s.store.Snapshot()
+	outboundLink := firstRunningLink(st.Nodes)
+	if outboundLink == "" {
+		writeError(w, http.StatusBadRequest, errors.New("no running node available for chain exit"))
+		return
+	}
+	code := chain.NewCode(req.Endpoint, outboundLink)
 	err := s.store.Update(func(st *model.AppState) error {
 		st.PairingCodes = append(st.PairingCodes, code)
 		return nil
@@ -715,6 +721,25 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if bundle, err := chain.DecodeBundle(strings.TrimSpace(req.Code)); err == nil {
+		name := req.DisplayName
+		if name == "" {
+			name = "Exit " + bundle.Code
+		}
+		err := s.store.Update(func(st *model.AppState) error {
+			st.ChainPeers = append(st.ChainPeers, model.ChainPeer{ID: util.Token(6), Name: name, Endpoint: bundle.Endpoint, PublicKey: bundle.PublicKey, OutboundLink: bundle.OutboundLink, Status: "paired", CreatedAt: time.Now()})
+			return nil
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		st := s.store.Snapshot()
+		_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
+		_ = singbox.RestartService()
+		writeJSON(w, http.StatusOK, map[string]any{"peer_public_key": bundle.PublicKey, "peer_endpoint": bundle.Endpoint, "tunnel_config": bundle})
+		return
+	}
 	var paired model.PairingCode
 	err := s.store.Update(func(st *model.AppState) error {
 		c, err := chain.Pair(st.PairingCodes, req.Code, req.Endpoint, req.PublicKey)
@@ -731,7 +756,7 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		if name == "" {
 			name = "Exit " + req.Code
 		}
-		st.ChainPeers = append(st.ChainPeers, model.ChainPeer{ID: util.Token(6), Name: name, Endpoint: c.Endpoint, PublicKey: c.PublicKey, Status: "paired", CreatedAt: time.Now()})
+		st.ChainPeers = append(st.ChainPeers, model.ChainPeer{ID: util.Token(6), Name: name, Endpoint: c.Endpoint, PublicKey: c.PublicKey, OutboundLink: c.OutboundLink, Status: "paired", CreatedAt: time.Now()})
 		return nil
 	})
 	if err != nil {
@@ -739,6 +764,20 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"peer_public_key": paired.PublicKey, "peer_endpoint": paired.Endpoint, "tunnel_config": paired})
+}
+
+func firstRunningLink(nodes []model.Node) string {
+	for _, n := range nodes {
+		if n.Status == "running" {
+			if n.SubscribeLink != "" {
+				return n.SubscribeLink
+			}
+			if link := subscribe.Link(n); link != "" {
+				return link
+			}
+		}
+	}
+	return ""
 }
 
 func (s *Server) SingBoxConfig(w http.ResponseWriter, r *http.Request) {

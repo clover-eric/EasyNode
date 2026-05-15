@@ -2,9 +2,11 @@ package singbox
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"easynode/internal/model"
@@ -53,6 +55,16 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, ce
 			"cache_file": map[string]any{"enabled": true},
 		},
 	}
+	chainTag := ""
+	outbounds := []any{map[string]any{"type": "direct", "tag": "direct"}}
+	if len(peers) > 0 {
+		if out := chainOutbound(peers[0]); out != nil {
+			chainTag = "chain-exit-" + peers[0].ID
+			out["tag"] = chainTag
+			outbounds = append(outbounds, out)
+		}
+	}
+	cfg["outbounds"] = outbounds
 	inbounds := make([]any, 0, len(nodes))
 	for _, n := range nodes {
 		if n.Status != "running" {
@@ -64,8 +76,8 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, ce
 		inbounds = append(inbounds, inbound(n, certPath, keyPath))
 	}
 	cfg["inbounds"] = inbounds
-	if len(peers) > 0 {
-		cfg["route"] = map[string]any{"final": "direct"}
+	if chainTag != "" {
+		cfg["route"] = map[string]any{"final": chainTag}
 	}
 	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -76,6 +88,66 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, ce
 	}
 	path := filepath.Join(dataDir, "sing-box.json")
 	return path, os.WriteFile(path, b, 0600)
+}
+
+func chainOutbound(peer model.ChainPeer) map[string]any {
+	u, err := url.Parse(peer.OutboundLink)
+	if err != nil || u.Hostname() == "" {
+		return nil
+	}
+	port, _ := strconv.Atoi(u.Port())
+	values := u.Query()
+	switch u.Scheme {
+	case "vless":
+		out := map[string]any{
+			"type":        "vless",
+			"server":      u.Hostname(),
+			"server_port": port,
+			"uuid":        strings.TrimPrefix(u.User.String(), ""),
+		}
+		if values.Get("security") == "reality" {
+			out["flow"] = values.Get("flow")
+			out["tls"] = map[string]any{
+				"enabled":     true,
+				"server_name": values.Get("sni"),
+				"utls":        map[string]any{"enabled": true, "fingerprint": valueOr(values.Get("fp"), "chrome")},
+				"reality": map[string]any{
+					"enabled":    true,
+					"public_key": values.Get("pbk"),
+					"short_id":   values.Get("sid"),
+				},
+			}
+		} else if values.Get("security") == "tls" {
+			out["tls"] = map[string]any{"enabled": true, "server_name": values.Get("sni")}
+		}
+		if values.Get("type") == "ws" {
+			out["transport"] = map[string]any{"type": "ws", "path": valueOr(values.Get("path"), "/")}
+		}
+		return out
+	case "trojan":
+		out := map[string]any{"type": "trojan", "server": u.Hostname(), "server_port": port}
+		if password, ok := u.User.Password(); ok {
+			out["password"] = password
+		} else {
+			out["password"] = u.User.Username()
+		}
+		out["tls"] = map[string]any{"enabled": true, "server_name": values.Get("sni")}
+		return out
+	case "hysteria2":
+		password := u.User.Username()
+		out := map[string]any{"type": "hysteria2", "server": u.Hostname(), "server_port": port, "password": password}
+		out["tls"] = map[string]any{"enabled": true, "server_name": values.Get("sni")}
+		return out
+	default:
+		return nil
+	}
+}
+
+func valueOr(v, fallback string) string {
+	if v == "" {
+		return fallback
+	}
+	return v
 }
 
 func inbound(n model.Node, certPath, keyPath string) map[string]any {
