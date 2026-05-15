@@ -69,13 +69,15 @@ type Environment struct {
 }
 
 type ChainPeer struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Endpoint     string    `json:"endpoint"`
-	PublicKey    string    `json:"public_key"`
-	OutboundLink string    `json:"outbound_link,omitempty"`
-	Status       string    `json:"status"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                    string    `json:"id"`
+	Name                  string    `json:"name"`
+	Endpoint              string    `json:"endpoint"`
+	PublicKey             string    `json:"public_key"`
+	OutboundLink          string    `json:"outbound_link,omitempty"`
+	Status                string    `json:"status"`
+	RemotePairingDisabled bool      `json:"remote_pairing_disabled,omitempty"`
+	RemoteStatusCheckedAt time.Time `json:"remote_status_checked_at,omitempty"`
+	CreatedAt             time.Time `json:"created_at"`
 }
 
 type PairingCode struct {

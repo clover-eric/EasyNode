@@ -77,6 +77,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
 	s.mux.HandleFunc("/api/v1/qrcode/subscribe", s.auth(s.SubscribeQRCode))
 	s.mux.HandleFunc("/api/v1/qrcode/node/", s.auth(s.NodeQRCode))
+	s.mux.HandleFunc("/api/v1/chain/public/status", s.ChainPublicStatus)
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
 	s.mux.HandleFunc("/api/v1/nodes/add", s.auth(s.AddNode))
 	s.mux.HandleFunc("/api/v1/nodes/remove", s.auth(s.RemoveNode))
@@ -227,6 +228,16 @@ func (s *Server) State(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, publicState(s.enrichedState()))
 }
 
+func (s *Server) ChainPublicStatus(w http.ResponseWriter, r *http.Request) {
+	st := s.store.Snapshot()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"pairing_disabled": st.ChainPairingDisabled,
+		"panel_path":       st.PanelPath,
+		"domain":           st.Domain,
+		"updated_at":       st.UpdatedAt,
+	})
+}
+
 func (s *Server) IPPurity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, detector.CheckPurity())
 }
@@ -242,7 +253,37 @@ func (s *Server) enrichedState() model.AppState {
 			st.Nodes[i].LatencyMS = nil
 		}
 	}
+	for i := range st.ChainPeers {
+		disabled, checked := remotePairingDisabled(st.ChainPeers[i].Endpoint)
+		st.ChainPeers[i].RemotePairingDisabled = disabled
+		st.ChainPeers[i].RemoteStatusCheckedAt = checked
+	}
 	return st
+}
+
+func remotePairingDisabled(endpoint string) (bool, time.Time) {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return false, time.Time{}
+	}
+	u.Path = "/api/v1/chain/public/status"
+	u.RawQuery = ""
+	client := http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(u.String())
+	if err != nil {
+		return false, time.Time{}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false, time.Time{}
+	}
+	var out struct {
+		PairingDisabled bool `json:"pairing_disabled"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return false, time.Time{}
+	}
+	return out.PairingDisabled, time.Now()
 }
 
 func (s *Server) Nodes(w http.ResponseWriter, r *http.Request) {

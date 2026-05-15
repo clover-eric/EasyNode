@@ -63,6 +63,7 @@ const copyText = {
     unpair: "解除配对",
     chainActive: "链式出口已启用",
     chainRemoved: "已解除配对",
+    remotePairingClosed: "落地已关闭配对",
     expired: "过期",
     paired: "配对完成",
     running: "运行中",
@@ -164,6 +165,7 @@ const copyText = {
     unpair: "Unpair",
     chainActive: "Chain exit enabled",
     chainRemoved: "Unpaired",
+    remotePairingClosed: "Exit pairing disabled",
     expired: "expires",
     paired: "Paired",
     running: "Running",
@@ -402,7 +404,9 @@ function chainPeersHTML() {
     const endpoint = p.endpoint || "-";
     const host = shortHost(endpoint);
     const name = shortPeerName(p.name, endpoint);
-    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)}</span></div><span class="chainPeerActions"><em>${p.status === "paired" ? t("paired") : esc(p.status || "-")}</em><button class="btn ghost" data-unpair="${esc(p.id)}">${t("unpair")}</button></span></div>`;
+    const status = p.remote_pairing_disabled ? t("remotePairingClosed") : (p.status === "paired" ? t("paired") : esc(p.status || "-"));
+    const tone = p.remote_pairing_disabled ? "warn" : "";
+    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)}</span></div><span class="chainPeerActions"><em class="${tone}">${status}</em><button class="btn ghost" data-unpair="${esc(p.id)}">${t("unpair")}</button></span></div>`;
   }).join("");
 }
 
