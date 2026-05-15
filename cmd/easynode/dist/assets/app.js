@@ -113,6 +113,7 @@ const copyText = {
     upgradeDoneAction: "完成，返回首页",
     upgradeFailed: "升级失败",
     updateAvailable: "发现新版本",
+    dismissUpdate: "关闭提醒",
     updateCurrent: "当前版本",
     updateLatest: "最新版本",
     updateNotes: "更新日记",
@@ -229,6 +230,7 @@ const copyText = {
     upgradeDoneAction: "Done, return home",
     upgradeFailed: "Upgrade failed",
     updateAvailable: "New version available",
+    dismissUpdate: "Dismiss",
     updateCurrent: "Current version",
     updateLatest: "Latest version",
     updateNotes: "Release notes",
@@ -558,13 +560,19 @@ async function checkUpdateNotice() {
   try {
     const info = await api("/api/v1/system/update-info");
     if (!info.update_available) return;
+    const dismissKey = "easynode.dismissedUpdateCommit";
+    if (info.latest_commit && localStorage.getItem(dismissKey) === info.latest_commit) return;
     const header = document.querySelector(".dashboardTop");
     if (!header || document.querySelector(".updateNotice")) return;
     const el = document.createElement("section");
     el.className = "updateNotice";
-    el.innerHTML = `<div><b>${t("updateAvailable")}</b><span>${t("updateCurrent")}: ${info.current_commit || "dev"} · ${t("updateLatest")}: ${info.latest_commit || "-"}</span>${updateNotesHTML(info.notes || [])}</div><button class="btn primary" id="noticeUpgrade">${t("onlineUpgrade")}</button>`;
+    el.innerHTML = `<div><b>${t("updateAvailable")}</b><span>${t("updateCurrent")}: ${info.current_commit || "dev"} · ${t("updateLatest")}: ${info.latest_commit || "-"}</span>${updateNotesHTML(info.notes || [])}</div><div class="noticeActions"><button class="btn primary" id="noticeUpgrade">${t("onlineUpgrade")}</button><button class="btn ghost" id="noticeDismiss">${t("dismissUpdate")}</button></div>`;
     header.insertAdjacentElement("afterend", el);
     $("#noticeUpgrade").onclick = showUpgradeConfirm;
+    $("#noticeDismiss").onclick = () => {
+      if (info.latest_commit) localStorage.setItem(dismissKey, info.latest_commit);
+      el.remove();
+    };
   } catch {}
 }
 
