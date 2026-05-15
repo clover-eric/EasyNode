@@ -38,3 +38,24 @@ button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;curs
 .bootBody b,.bootBody span{display:block}.bootBody span{margin-top:3px;color:var(--muted);font-size:13px}
 .bootSpinner{width:28px;height:28px;border:3px solid rgba(103,232,249,.18);border-top-color:#67e8f9;border-radius:50%;animation:spin .8s linear infinite;flex:0 0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
+@supports(padding:max(0px)){
+  .shell{padding-top:max(28px,calc(env(safe-area-inset-top) + 18px));padding-right:max(18px,calc(env(safe-area-inset-right) + 18px));padding-bottom:max(28px,calc(env(safe-area-inset-bottom) + 24px));padding-left:max(18px,calc(env(safe-area-inset-left) + 18px))}
+  .toast{right:max(14px,calc(env(safe-area-inset-right) + 14px));bottom:max(14px,calc(env(safe-area-inset-bottom) + 14px));left:max(14px,calc(env(safe-area-inset-left) + 14px))}
+  .modal{padding-top:max(18px,calc(env(safe-area-inset-top) + 18px));padding-right:max(14px,calc(env(safe-area-inset-right) + 14px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 18px));padding-left:max(14px,calc(env(safe-area-inset-left) + 14px))}
+}
+@media(max-width:430px){
+  body{background:var(--bg)}
+  .shell{width:100%;max-width:none;overflow-x:hidden}
+  .dashboardTop{margin-bottom:14px;padding:14px 12px;border-radius:8px;gap:12px}
+  .brand{gap:10px;min-width:0}.mark{width:40px;height:40px;flex:0 0 auto}.mark:before{inset:9px}.mark:after{left:10px;right:10px;top:19px}.mark span:before{left:9px;top:16px}.mark span:after{right:9px;top:16px}
+  h1{font-size:24px}.brand h1{font-size:23px}.brand p{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
+  .brandBlock{gap:10px}.topMeta{display:grid;grid-template-columns:1fr;gap:6px}.topMeta span{padding:7px 9px;line-height:1.25}
+  .actionPanel{gap:8px}.actionGroup{grid-template-columns:1fr 1fr;padding:4px;gap:4px}.subtleGroup{grid-template-columns:1fr 1fr}.subtleGroup .langBtn{grid-column:1/-1}.actionGroup .btn{min-height:38px;padding:8px 8px;font-size:13px}
+  .grid,.split,.chainGrid{gap:12px}.card{padding:14px;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.24)}.card:hover,.protocolOption:hover{transform:none}.cardHead{margin-bottom:10px}.proto{font-size:19px}.desc{min-height:0;font-size:14px}.miniInfo{font-size:12px}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.stat{padding:8px 6px;min-width:0}.stat b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stat span{font-size:11px}
+  .row{gap:7px}.row .btn{min-width:calc(50% - 4px);min-height:38px;padding:8px 8px;font-size:13px}
+  .chainRow{display:grid;grid-template-columns:1fr}.chainRow input,.chainRow .btn{width:100%;min-width:0}.chainNotice{font-size:13px;line-height:1.5}.chainPeerMeta,.chainPeerActions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.chainPeerMeta i,.chainPeer em{text-align:center}
+  .panel{margin-top:0;padding:16px}.panel.wide{margin-top:0}.steps,.protocolGrid,.checks,.modeSwitch{gap:10px}.protocolOption{padding:12px}.protocolGrid .protocolOption{padding:14px}.optionTop strong{font-size:16px}.optionText,.optionMeta,.optionTrade{font-size:13px}
+  .loginShell{place-items:start center}.loginPanel{border-radius:8px}.loginHero{min-height:190px;padding:18px}.loginForm{padding:18px}.loginPulse{height:120px}
+  .dialog{padding:16px}.dialogHead{display:grid}.qrImageWrap{width:min(260px,100%);height:auto;aspect-ratio:1}.qrBox img{width:100%;height:auto}.configViewer{max-width:100%;font-size:11px}
+}
