@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -727,12 +728,9 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if bundle, err := chain.DecodeBundle(strings.TrimSpace(req.Code)); err == nil {
-		name := req.DisplayName
-		if name == "" {
-			name = "Exit " + bundle.Code
-		}
+		name := chainPeerName(req.DisplayName, bundle.Endpoint)
 		err := s.store.Update(func(st *model.AppState) error {
-			st.ChainPeers = append(st.ChainPeers, model.ChainPeer{ID: util.Token(6), Name: name, Endpoint: bundle.Endpoint, PublicKey: bundle.PublicKey, OutboundLink: bundle.OutboundLink, Status: "paired", CreatedAt: time.Now()})
+			upsertChainPeer(st, model.ChainPeer{ID: util.Token(6), Name: name, Endpoint: bundle.Endpoint, PublicKey: bundle.PublicKey, OutboundLink: bundle.OutboundLink, Status: "paired", CreatedAt: time.Now()})
 			return nil
 		})
 		if err != nil {
@@ -757,11 +755,8 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 				st.PairingCodes[i].Used = true
 			}
 		}
-		name := req.DisplayName
-		if name == "" {
-			name = "Exit " + req.Code
-		}
-		st.ChainPeers = append(st.ChainPeers, model.ChainPeer{ID: util.Token(6), Name: name, Endpoint: c.Endpoint, PublicKey: c.PublicKey, OutboundLink: c.OutboundLink, Status: "paired", CreatedAt: time.Now()})
+		name := chainPeerName(req.DisplayName, c.Endpoint)
+		upsertChainPeer(st, model.ChainPeer{ID: util.Token(6), Name: name, Endpoint: c.Endpoint, PublicKey: c.PublicKey, OutboundLink: c.OutboundLink, Status: "paired", CreatedAt: time.Now()})
 		return nil
 	})
 	if err != nil {
@@ -769,6 +764,35 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"peer_public_key": paired.PublicKey, "peer_endpoint": paired.Endpoint, "tunnel_config": paired})
+}
+
+func upsertChainPeer(st *model.AppState, peer model.ChainPeer) {
+	for i := range st.ChainPeers {
+		if st.ChainPeers[i].Endpoint == peer.Endpoint || (peer.OutboundLink != "" && st.ChainPeers[i].OutboundLink == peer.OutboundLink) {
+			if st.ChainPeers[i].ID != "" {
+				peer.ID = st.ChainPeers[i].ID
+			}
+			if !st.ChainPeers[i].CreatedAt.IsZero() {
+				peer.CreatedAt = st.ChainPeers[i].CreatedAt
+			}
+			st.ChainPeers[i] = peer
+			return
+		}
+	}
+	st.ChainPeers = append(st.ChainPeers, peer)
+}
+
+func chainPeerName(displayName, endpoint string) string {
+	if displayName != "" && len(displayName) <= 40 && !strings.HasPrefix(displayName, "Exit ENPAIR-") {
+		return displayName
+	}
+	if u, err := url.Parse(endpoint); err == nil && u.Hostname() != "" {
+		return "Exit " + u.Hostname()
+	}
+	if endpoint != "" && len(endpoint) <= 40 {
+		return "Exit " + endpoint
+	}
+	return "Chain exit"
 }
 
 func firstRunningLink(nodes []model.Node) string {

@@ -381,6 +381,35 @@ function renderLogin() {
   };
 }
 
+function chainPeersHTML() {
+  const peers = state.chain_peers || [];
+  if (!peers.length) return `<div class="notice">${t("noPeers")}</div>`;
+  return peers.map(p => {
+    const endpoint = p.endpoint || "-";
+    const host = shortHost(endpoint);
+    const name = shortPeerName(p.name, endpoint);
+    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)}</span></div><em>${p.status === "paired" ? t("paired") : esc(p.status || "-")}</em></div>`;
+  }).join("");
+}
+
+function shortPeerName(name, endpoint) {
+  if (!name || name.length > 42 || name.startsWith("Exit ENPAIR-")) return "Exit " + shortHost(endpoint);
+  return name;
+}
+
+function shortHost(raw) {
+  try {
+    const u = new URL(raw);
+    return u.hostname || raw;
+  } catch {
+    return raw.length > 42 ? raw.slice(0, 18) + "..." + raw.slice(-10) : raw;
+  }
+}
+
+function esc(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function renderDashboard() {
   const sub = `${location.origin}/api/v1/subscribe/${state.subscribe_key}`;
   const runningCount = state.nodes.filter(n => n.status === "running").length;
@@ -399,7 +428,7 @@ function renderDashboard() {
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
     <section class="split chainGrid" style="margin-top:16px">
       <div class="card chainCard"><div class="proto">${t("chainProxy")}</div><p>${t("chainText")}</p><div class="row chainRow" style="margin-top:14px"><input id="genEndpoint" placeholder="${t("endpointPlaceholder")}" value="${location.origin}"><button class="btn primary" id="genCode">${t("generateCode")}</button></div><div id="codeBox" class="notice chainNotice">1. 在落地服务器生成配对令牌。2. 到入口服务器粘贴令牌并完成配对。</div></div>
-      <div class="card chainCard"><div class="proto">${t("addExit")}</div><p>${t("addExitText")}</p><div class="field"><label>${t("pairingCode")}</label><textarea class="copyBox chainTokenInput" id="pairCode" placeholder="ENPAIR-..."></textarea></div><div class="field"><label>${t("myEndpoint")}</label><input id="pairEndpoint" placeholder="${location.origin}" value="${location.origin}"></div><button class="btn primary" id="pairBtn">${t("pairDoneButton")}</button><div class="notice">${(state.chain_peers || []).map(p => `${p.name} · ${p.status} · ${p.endpoint || "-"}`).join("<br>") || t("noPeers")}</div></div>
+      <div class="card chainCard"><div class="proto">${t("addExit")}</div><p>${t("addExitText")}</p><div class="field"><label>${t("pairingCode")}</label><textarea class="copyBox chainTokenInput" id="pairCode" placeholder="ENPAIR-..."></textarea></div><div class="field"><label>${t("myEndpoint")}</label><input id="pairEndpoint" placeholder="${location.origin}" value="${location.origin}"></div><button class="btn primary" id="pairBtn">${t("pairDoneButton")}</button><div class="chainPeers">${chainPeersHTML()}</div></div>
     </section>
   </main>`;
   $("#langBtn").onclick = switchLang;
@@ -418,7 +447,7 @@ function renderDashboard() {
   };
   $("#pairBtn").onclick = async () => {
     try {
-      await api("/api/v1/chain/pair", { method: "POST", body: JSON.stringify({ code: $("#pairCode").value.trim(), my_endpoint: $("#pairEndpoint").value || location.origin, my_public_key: crypto.randomUUID(), display_name: "Exit " + $("#pairCode").value.trim() }) });
+      await api("/api/v1/chain/pair", { method: "POST", body: JSON.stringify({ code: $("#pairCode").value.trim(), my_endpoint: $("#pairEndpoint").value || location.origin, my_public_key: crypto.randomUUID(), display_name: "" }) });
       state = await api("/api/v1/state");
       toast(t("paired"));
       renderDashboard();
