@@ -528,7 +528,7 @@ function renderProtocolLibrary() {
           <span class="optionText">${p.summary}</span>
           <span class="optionMeta"><b>${t("bestFor")}</b>${p.bestFor}</span>
           <span class="optionTrade">${ready ? t("availableNow") : t("comingSoon")}</span>
-          ${exists ? `<button class="btn" data-remove-protocol="${id}">${t("remove")}</button>` : `<button class="btn" ${!ready ? "disabled" : ""} data-add-protocol="${id}">${ready ? t("add") : t("comingSoon")}</button>`}
+          <span class="optionAction">${exists ? `<button class="btn" data-remove-protocol="${id}">${t("remove")}</button>` : `<button class="btn" ${!ready ? "disabled" : ""} data-add-protocol="${id}">${ready ? t("add") : t("comingSoon")}</button>`}</span>
         </span>
       </div>`;
     }).join("")}</div>
@@ -821,10 +821,22 @@ async function showSingBoxConfig() {
     } catch {}
     $("#configViewer").textContent = pretty;
     $("#copyConfigBtn").onclick = () => copy(pretty, $("#copyConfigBtn"));
-    $("#downloadConfigBtn").onclick = () => location.href = "/api/v1/sing-box/config";
+    $("#downloadConfigBtn").onclick = () => downloadText("sing-box.json", pretty);
   } catch (e) {
     $("#configViewer").textContent = e.message || t("requestFailed");
   }
+}
+
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
 async function copy(text, button) {
