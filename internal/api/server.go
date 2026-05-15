@@ -348,7 +348,13 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) UpgradeStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, s.upgradeSnapshot())
+	st := s.upgradeSnapshot()
+	sys := systemdUpgradeStatus()
+	if sys.Output != "" || sys.Running || sys.Progress == 100 {
+		writeJSON(w, http.StatusOK, sys)
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
 }
 
 func (s *Server) runUpgrade(backup string) {
@@ -402,6 +408,60 @@ func upgradeUnitResult() (string, string) {
 		code = strings.TrimSpace(lines[1])
 	}
 	return result, code
+}
+
+func systemdUpgradeStatus() upgradeState {
+	out, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "120", "--no-pager").CombinedOutput()
+	logs := string(out)
+	active := exec.Command("systemctl", "is-active", "--quiet", "easynode-upgrade").Run() == nil
+	result, code := upgradeUnitResult()
+	st := upgradeState{
+		Running:   active,
+		Progress:  0,
+		Step:      "waiting",
+		Output:    logs,
+		UpdatedAt: time.Now(),
+	}
+	if active {
+		st.Progress = inferUpgradeProgress(logs)
+		st.Step = "installing update"
+		return st
+	}
+	if strings.Contains(logs, "EasyNode installed.") || (result == "success" && code == "0") {
+		st.Progress = 100
+		st.Step = "upgrade complete, refreshing panel"
+		return st
+	}
+	if result != "unknown" && result != "" && result != "success" {
+		st.Progress = 100
+		st.Step = "upgrade failed"
+		st.Error = "upgrade task failed: result=" + result + " status=" + code
+		return st
+	}
+	return upgradeState{}
+}
+
+func inferUpgradeProgress(logs string) int {
+	progress := 10
+	markers := []struct {
+		text     string
+		progress int
+	}{
+		{"[1/8]", 15},
+		{"[2/8]", 25},
+		{"[3/8]", 40},
+		{"[4/8]", 52},
+		{"[5/8]", 65},
+		{"[6/8]", 78},
+		{"[7/8]", 88},
+		{"[8/8]", 95},
+	}
+	for _, m := range markers {
+		if strings.Contains(logs, m.text) {
+			progress = m.progress
+		}
+	}
+	return progress
 }
 
 func (s *Server) setUpgrade(progress int, step, output, errText, backup string, running bool) {
