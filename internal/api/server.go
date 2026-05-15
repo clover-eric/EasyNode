@@ -265,6 +265,9 @@ func (s *Server) NodeAction(w http.ResponseWriter, r *http.Request) {
 	err := s.store.Update(func(st *model.AppState) error {
 		for i := range st.Nodes {
 			if st.Nodes[i].ID == id {
+				if st.Nodes[i].Protocol != "vless-reality" {
+					return errors.New("this protocol requires certificate support and is not available yet")
+				}
 				if st.Nodes[i].Status == "running" {
 					st.Nodes[i].Status = "stopped"
 				} else {

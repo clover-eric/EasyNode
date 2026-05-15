@@ -53,6 +53,8 @@ const copyText = {
     start: "启动",
     copied: "已复制",
     copyFailed: "复制失败，请长按或手动复制",
+    unavailable: "暂不可用",
+    certRequired: "需要域名证书接入后才可使用",
     language: "English",
     settingsTitle: "系统设置",
     currentPassword: "当前密码",
@@ -110,6 +112,8 @@ const copyText = {
     start: "Start",
     copied: "Copied",
     copyFailed: "Copy failed. Please copy manually.",
+    unavailable: "Unavailable",
+    certRequired: "Requires domain certificate support",
     language: "中文",
     settingsTitle: "System settings",
     currentPassword: "Current password",
@@ -308,9 +312,13 @@ function renderDashboard() {
     copy(n?.subscribe_link || "", b);
   });
   document.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => {
-    state.nodes = await api(`/api/v1/nodes/${b.dataset.toggle}/toggle`, { method: "POST" });
-    state = await api("/api/v1/state");
-    renderDashboard();
+    try {
+      state.nodes = await api(`/api/v1/nodes/${b.dataset.toggle}/toggle`, { method: "POST" });
+      state = await api("/api/v1/state");
+      renderDashboard();
+    } catch (e) {
+      toast(e.message || t("unavailable"));
+    }
   });
 }
 
@@ -362,12 +370,16 @@ function renderSettings() {
 function nodeCard(n) {
   const used = (n.traffic_used / 1024 / 1024).toFixed(1);
   const p = profile(n.protocol);
+  const canCopy = n.status === "running" && n.subscribe_link;
+  const copyButton = canCopy
+    ? `<button class="btn" data-node-copy="${n.id}">${t("copyLink")}</button>`
+    : `<button class="btn" disabled title="${t("certRequired")}">${t("unavailable")}</button>`;
   return `<article class="card ${n.status}">
     <div class="cardHead"><div class="status"><i class="dot"></i>${n.status === "running" ? t("running") : t("stopped")}</div><span class="badge starBadge">${stars(p.score)}</span></div>
     <div class="proto">${p.title}</div><p class="desc">${p.summary}</p>
     <div class="miniInfo">${p.protocol} · ${p.clients || t("mainstreamClients")}</div>
     <div class="stats"><div class="stat"><b>${n.latency_ms ?? "-"}ms</b><span>${t("latency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${used}M</b><span>${t("traffic")}</span></div></div>
-    <div class="row"><button class="btn" data-node-copy="${n.id}">${t("copyLink")}</button><button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
+    <div class="row">${copyButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
   </article>`;
 }
 
