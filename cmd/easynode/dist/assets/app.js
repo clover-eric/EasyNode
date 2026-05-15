@@ -15,6 +15,10 @@ const copyText = {
     panelPath: "面板路径",
     domain: "你的域名",
     ipDirect: "我暂时没有域名，先用 IP 直连",
+    domainMode: "域名部署",
+    ipMode: "IP 直连",
+    domainModeText: "自动申请证书，启用更多协议",
+    ipModeText: "无需域名，只部署可直接使用的节点",
     nodePlan: "节点方案",
     restoreRecommended: "恢复推荐",
     recommendation: "推荐度",
@@ -84,6 +88,10 @@ const copyText = {
     panelPath: "Panel path",
     domain: "Your domain",
     ipDirect: "No domain yet, use IP direct mode",
+    domainMode: "Domain setup",
+    ipMode: "IP direct",
+    domainModeText: "Issue certificates automatically and enable more protocols",
+    ipModeText: "No domain required; deploy directly usable nodes only",
     nodePlan: "Node plans",
     restoreRecommended: "Restore recommended",
     recommendation: "Score",
@@ -229,7 +237,11 @@ function renderSetup(setup) {
       </div>
       <div>
         <div class="field"><label>${t("domain")}</label><input id="domain" placeholder="example.com"></div>
-        <label class="check compact"><input id="ipDirect" type="checkbox">${t("ipDirect")}</label>
+        <div class="modeSwitch">
+          <button class="modeBtn active" type="button" id="domainMode"><b>${t("domainMode")}</b><span>${t("domainModeText")}</span></button>
+          <button class="modeBtn" type="button" id="ipMode"><b>${t("ipMode")}</b><span>${t("ipModeText")}</span></button>
+        </div>
+        <input id="ipDirect" type="checkbox" hidden>
       </div>
     </div>
     <div class="sectionTitle"><span>${t("nodePlan")}</span><button class="btn ghost" id="selectRecommended">${t("restoreRecommended")}</button></div>
@@ -240,8 +252,11 @@ function renderSetup(setup) {
   </section></main>`;
   $("#langBtn").onclick = switchLang;
   $("#selectRecommended").onclick = () => {
-    document.querySelectorAll("input[name=proto]").forEach(x => x.checked = profile(x.value).enabled);
+    applyProtocolAvailability();
   };
+  $("#domainMode").onclick = () => setIPMode(false);
+  $("#ipMode").onclick = () => setIPMode(true);
+  applyProtocolAvailability();
   $("#setupBtn").onclick = async () => {
     $("#setupBtn").disabled = true;
     $("#setupBtn").textContent = t("deploying");
@@ -265,6 +280,25 @@ function renderSetup(setup) {
       $("#setupBtn").textContent = t("setupButton");
     }
   };
+}
+
+function setIPMode(enabled) {
+  $("#ipDirect").checked = enabled;
+  $("#domainMode").classList.toggle("active", !enabled);
+  $("#ipMode").classList.toggle("active", enabled);
+  $("#domain").disabled = enabled;
+  applyProtocolAvailability();
+}
+
+function applyProtocolAvailability() {
+  const ipMode = $("#ipDirect")?.checked;
+  document.querySelectorAll("input[name=proto]").forEach(x => {
+    const directOnly = x.value === "vless-reality";
+    x.disabled = ipMode && !directOnly;
+    x.checked = ipMode ? directOnly : profile(x.value).enabled;
+    const card = x.closest(".protocolOption");
+    if (card) card.classList.toggle("disabled", x.disabled);
+  });
 }
 
 function protocolOption(id, p) {
