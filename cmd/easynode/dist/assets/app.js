@@ -96,6 +96,7 @@ const copyText = {
     risks: "风险提示",
     copyLink: "复制链接",
     showQR: "二维码",
+    importShadowrocket: "导入小火箭",
     scanToImport: "扫码导入",
     stop: "停止",
     start: "启动",
@@ -219,6 +220,7 @@ const copyText = {
     risks: "Risk flags",
     copyLink: "Copy link",
     showQR: "QR code",
+    importShadowrocket: "Import to Shadowrocket",
     scanToImport: "Scan to import",
     stop: "Stop",
     start: "Start",
@@ -319,6 +321,12 @@ function toast(text) {
 }
 
 function protocolName(p) { return profile(p)?.protocol || p; }
+function supportsShadowrocket(n) {
+  return /Shadowrocket/i.test(profile(n.protocol)?.clients || "");
+}
+function shadowrocketImportURL(link) {
+  return `shadowrocket://add/${encodeURIComponent(link)}`;
+}
 function stars(score) {
   const n = Number(String(score).split("/")[0]) || 0;
   return `<span class="stars" aria-label="${score}">${"★".repeat(n)}${"☆".repeat(5 - n)}</span>`;
@@ -582,6 +590,12 @@ function renderDashboard() {
   document.querySelectorAll("[data-node-qr]").forEach(b => b.onclick = () => {
     const n = state.nodes.find(x => x.id === b.dataset.nodeQr);
     showQR(n?.subscribe_link || "", n ? protocolName(n.protocol) : "", n ? `/api/v1/qrcode/node/${encodeURIComponent(n.id)}` : "");
+  });
+  document.querySelectorAll("[data-node-shadowrocket]").forEach(b => b.onclick = async () => {
+    const n = state.nodes.find(x => x.id === b.dataset.nodeShadowrocket);
+    if (!n?.subscribe_link) return;
+    try { await navigator.clipboard.writeText(n.subscribe_link); } catch {}
+    location.href = shadowrocketImportURL(n.subscribe_link);
   });
   document.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => {
     try {
@@ -893,12 +907,13 @@ function nodeCard(n) {
     ? `<button class="btn" data-node-copy="${n.id}">${t("copyLink")}</button>`
     : `<button class="btn" disabled title="${t("certRequired")}">${t("unavailable")}</button>`;
   const qrButton = canCopy ? `<button class="btn" data-node-qr="${n.id}">${t("showQR")}</button>` : "";
+  const shadowrocketButton = canCopy && supportsShadowrocket(n) ? `<button class="btn" data-node-shadowrocket="${n.id}">${t("importShadowrocket")}</button>` : "";
   return `<article class="card ${n.status}">
     <div class="cardHead"><div class="status"><i class="dot"></i>${n.status === "running" ? t("running") : t("stopped")}</div><span class="badge starBadge">${stars(p.score)}</span></div>
     <div class="proto">${p.title}</div><p class="desc">${p.summary}</p>
     <div class="miniInfo">${p.protocol} · ${p.clients || t("mainstreamClients")}</div>
     <div class="stats"><div class="stat"><b>${n.latency_ms ? `${n.latency_ms}ms` : "-"}</b><span>${t("mainlandLatency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${formatBytes(n.traffic_used || 0)}</b><span>${t("traffic")}</span></div></div>
-    <div class="row">${copyButton}${qrButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
+    <div class="row">${copyButton}${qrButton}${shadowrocketButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
   </article>`;
 }
 
