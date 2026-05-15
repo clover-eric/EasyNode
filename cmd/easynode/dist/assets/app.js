@@ -28,6 +28,10 @@ const copyText = {
     nodes: "个节点",
     copySub: "复制订阅",
     settings: "设置",
+    addProtocol: "添加协议",
+    protocolLibrary: "协议库",
+    availableNow: "可立即使用",
+    comingSoon: "证书接入后可用",
     config: "sing-box 配置",
     logout: "退出",
     chainProxy: "链式代理",
@@ -60,6 +64,9 @@ const copyText = {
     currentPassword: "当前密码",
     newPassword: "新密码（可留空）",
     saveSettings: "保存设置",
+    onlineUpgrade: "在线升级",
+    upgradeTip: "升级会先备份配置，过程中面板可能短暂断开。建议在业务低峰操作。",
+    upgradeStarted: "升级已执行，请稍后刷新页面",
     cancel: "取消",
     saved: "已保存",
     currentPasswordRequired: "请输入当前密码"
@@ -87,6 +94,10 @@ const copyText = {
     nodes: "nodes",
     copySub: "Copy subscription",
     settings: "Settings",
+    addProtocol: "Add protocol",
+    protocolLibrary: "Protocol library",
+    availableNow: "Available now",
+    comingSoon: "Available after certificate support",
     config: "sing-box config",
     logout: "Log out",
     chainProxy: "Chain proxy",
@@ -119,6 +130,9 @@ const copyText = {
     currentPassword: "Current password",
     newPassword: "New password (optional)",
     saveSettings: "Save settings",
+    onlineUpgrade: "Online upgrade",
+    upgradeTip: "Upgrade creates a backup first. The panel may disconnect briefly. Run it during low traffic hours.",
+    upgradeStarted: "Upgrade executed. Refresh the page later.",
     cancel: "Cancel",
     saved: "Saved",
     currentPasswordRequired: "Current password required"
@@ -280,7 +294,7 @@ function renderDashboard() {
   app.innerHTML = `<main class="shell">
     <header class="top">
       <div class="brand"><div class="mark"><span></span></div><div><h1>EasyNode</h1><p>${state.domain || "IP direct"} · ${state.nodes.length} ${t("nodes")} · ${t("panelPath")} ${state.panel_path}</p></div></div>
-      <div class="actions">${langButton()}<button class="btn" id="settingsBtn">${t("settings")}</button><button class="btn" id="copySub">${t("copySub")}</button><button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
+      <div class="actions">${langButton()}<button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button><button class="btn" id="copySub">${t("copySub")}</button><button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
     </header>
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
     <section class="split" style="margin-top:16px">
@@ -289,6 +303,7 @@ function renderDashboard() {
     </section>
   </main>`;
   $("#langBtn").onclick = switchLang;
+  $("#protocolsBtn").onclick = renderProtocolLibrary;
   $("#settingsBtn").onclick = renderSettings;
   $("#copySub").onclick = () => copy(sub, $("#copySub"));
   $("#downloadCfg").onclick = () => location.href = "/api/v1/sing-box/config";
@@ -322,6 +337,30 @@ function renderDashboard() {
   });
 }
 
+function renderProtocolLibrary() {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `<div class="dialog">
+    <div class="dialogHead"><div><h2>${t("protocolLibrary")}</h2><p>${t("setupHintText")}</p></div><button class="btn ghost" id="closeProtocols">${t("cancel")}</button></div>
+    <div class="protocolGrid" style="margin-top:14px">${allProfiles().map(([id, p]) => {
+      const exists = state.nodes.some(n => n.protocol === id);
+      const ready = id === "vless-reality";
+      return `<div class="protocolOption ${exists ? "exists" : ""}">
+        <span></span><span class="optionBody">
+          <span class="optionTop"><strong>${p.title}</strong><em>${stars(p.score)}</em></span>
+          <span class="optionProtocol">${p.protocol}</span>
+          <span class="optionText">${p.summary}</span>
+          <span class="optionMeta"><b>${t("bestFor")}</b>${p.bestFor}</span>
+          <span class="optionTrade">${ready ? t("availableNow") : t("comingSoon")}</span>
+          <button class="btn" disabled>${exists ? t("settings") : (ready ? t("availableNow") : t("comingSoon"))}</button>
+        </span>
+      </div>`;
+    }).join("")}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  $("#closeProtocols").onclick = () => modal.remove();
+}
+
 function renderSettings() {
   const modal = document.createElement("div");
   modal.className = "modal";
@@ -339,6 +378,8 @@ function renderSettings() {
       </div>
     </div>
     <button class="btn primary big" id="saveSettings">${t("saveSettings")}</button>
+    <div class="notice">${t("upgradeTip")}</div>
+    <button class="btn big" id="upgradeBtn">${t("onlineUpgrade")}</button>
     <div id="settingsErr" class="error"></div>
   </div>`;
   document.body.appendChild(modal);
@@ -363,6 +404,16 @@ function renderSettings() {
     } catch (e) {
       $("#settingsErr").textContent = e.message;
       $("#saveSettings").disabled = false;
+    }
+  };
+  $("#upgradeBtn").onclick = async () => {
+    if (!confirm(t("upgradeTip"))) return;
+    $("#upgradeBtn").disabled = true;
+    try {
+      await api("/api/v1/system/upgrade", { method: "POST", body: "{}" });
+      toast(t("upgradeStarted"));
+    } catch (e) {
+      toast(e.message || t("upgradeStarted"));
     }
   };
 }

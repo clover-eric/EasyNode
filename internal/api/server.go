@@ -8,6 +8,8 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -48,6 +50,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/logout", s.Logout)
 	s.mux.HandleFunc("/api/v1/state", s.auth(s.State))
 	s.mux.HandleFunc("/api/v1/settings", s.auth(s.UpdateSettings))
+	s.mux.HandleFunc("/api/v1/system/upgrade", s.auth(s.Upgrade))
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
 	s.mux.HandleFunc("/api/v1/nodes/", s.auth(s.NodeAction))
 	s.mux.HandleFunc("/api/v1/subscribe/", s.Subscribe)
@@ -180,6 +183,25 @@ func (s *Server) Nodes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.store.Snapshot().Nodes)
 }
 
+func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	backup := filepath.Join(s.dataDir, "backup-"+time.Now().Format("20060102-150405"))
+	_ = os.MkdirAll(backup, 0700)
+	if b, err := os.ReadFile(filepath.Join(s.dataDir, "state.json")); err == nil {
+		_ = os.WriteFile(filepath.Join(backup, "state.json"), b, 0600)
+	}
+	cmd := exec.Command("bash", "-c", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "output": string(out), "backup": backup})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "upgrade started", "output": string(out), "backup": backup})
+}
+
 func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		method(w)
@@ -265,8 +287,8 @@ func (s *Server) NodeAction(w http.ResponseWriter, r *http.Request) {
 	err := s.store.Update(func(st *model.AppState) error {
 		for i := range st.Nodes {
 			if st.Nodes[i].ID == id {
-				if st.Nodes[i].Protocol != "vless-reality" {
-					return errors.New("this protocol requires certificate support and is not available yet")
+				if !protocolRunnable(st.Nodes[i].Protocol) {
+					return errors.New(protocolUnavailableReason(st.Nodes[i].Protocol))
 				}
 				if st.Nodes[i].Status == "running" {
 					st.Nodes[i].Status = "stopped"
@@ -444,7 +466,7 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 			n.RealityPrivateKey = m.PrivateKey
 			n.RealityPublicKey = m.PublicKey
 			n.RealityShortID = m.ShortID
-		} else {
+		} else if !protocolRunnable(n.Protocol) {
 			n.Status = "stopped"
 		}
 		lat := 18 + len(nodes)*11
@@ -455,6 +477,19 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 		nodes = append(nodes, n)
 	}
 	return nodes
+}
+
+func protocolRunnable(protocol string) bool {
+	return protocol == "vless-reality"
+}
+
+func protocolUnavailableReason(protocol string) string {
+	switch protocol {
+	case "trojan-tls", "hysteria2", "vless-ws-tls", "tuic":
+		return "this protocol requires certificate automation before it can be enabled"
+	default:
+		return "this protocol is not available yet"
+	}
 }
 
 func (s *Server) ensureRunnableNodes() error {
