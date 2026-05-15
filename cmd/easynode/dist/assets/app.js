@@ -33,6 +33,7 @@ const copyText = {
     loginButton: "进入面板",
     nodes: "个节点",
     copySub: "复制订阅",
+    subQR: "订阅二维码",
     settings: "设置",
     addProtocol: "添加协议",
     protocolLibrary: "协议库",
@@ -126,6 +127,7 @@ const copyText = {
     loginButton: "Open panel",
     nodes: "nodes",
     copySub: "Copy subscription",
+    subQR: "Subscription QR",
     settings: "Settings",
     addProtocol: "Add protocol",
     protocolLibrary: "Protocol library",
@@ -384,7 +386,7 @@ function renderDashboard() {
   app.innerHTML = `<main class="shell">
     <header class="top">
       <div class="brand"><div class="mark"><span></span></div><div><h1>EasyNode</h1><p>${state.domain || "IP direct"} · ${state.nodes.length} ${t("nodes")} · ${t("panelPath")} ${state.panel_path}</p></div></div>
-      <div class="actions">${langButton()}<button class="btn" id="purityBtn">${t("ipPurity")}</button><button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button><button class="btn" id="copySub">${t("copySub")}</button><button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
+      <div class="actions">${langButton()}<button class="btn" id="purityBtn">${t("ipPurity")}</button><button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button><button class="btn" id="copySub">${t("copySub")}</button><button class="btn" id="subQR">${t("subQR")}</button><button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
     </header>
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
     <section class="split" style="margin-top:16px">
@@ -397,6 +399,7 @@ function renderDashboard() {
   $("#protocolsBtn").onclick = renderProtocolLibrary;
   $("#settingsBtn").onclick = renderSettings;
   $("#copySub").onclick = () => copy(sub, $("#copySub"));
+  $("#subQR").onclick = () => showQR(sub, t("subQR"), "/api/v1/qrcode/subscribe");
   $("#downloadCfg").onclick = () => location.href = "/api/v1/sing-box/config";
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
   $("#genCode").onclick = async () => {
@@ -419,7 +422,7 @@ function renderDashboard() {
   });
   document.querySelectorAll("[data-node-qr]").forEach(b => b.onclick = () => {
     const n = state.nodes.find(x => x.id === b.dataset.nodeQr);
-    showQR(n?.subscribe_link || "", n ? protocolName(n.protocol) : "");
+    showQR(n?.subscribe_link || "", n ? protocolName(n.protocol) : "", n ? `/api/v1/qrcode/node/${encodeURIComponent(n.id)}` : "");
   });
   document.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => {
     try {
@@ -700,20 +703,24 @@ async function showPurity() {
   }
 }
 
-function showQR(text, title) {
+function showQR(text, title, imageURL) {
   if (!text) {
     toast(t("copyFailed"));
     return;
   }
   const modal = document.createElement("div");
   modal.className = "modal";
-  const src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(text)}`;
+  const src = imageURL || "";
   modal.innerHTML = `<div class="dialog qrDialog">
     <div class="dialogHead"><div><h2>${t("scanToImport")}</h2><p>${title}</p></div><button class="btn ghost" id="closeQR">${t("cancel")}</button></div>
-    <div class="qrBox"><img src="${src}" alt="QR code"><textarea class="copyBox" readonly>${text}</textarea></div>
+    <div class="qrBox"><div class="qrImageWrap"><div class="qrLoading">${t("checking")}</div><img id="qrImg" src="${src}" alt="QR code"></div><textarea class="copyBox" readonly>${text}</textarea></div>
   </div>`;
   document.body.appendChild(modal);
   $("#closeQR").onclick = () => modal.remove();
+  $("#qrImg").onload = () => {
+    const loading = modal.querySelector(".qrLoading");
+    if (loading) loading.remove();
+  };
 }
 
 async function copy(text, button) {

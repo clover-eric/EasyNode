@@ -26,6 +26,8 @@ import (
 	"easynode/internal/model"
 	"easynode/internal/store"
 	"easynode/internal/util"
+
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 type Server struct {
@@ -68,6 +70,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/settings", s.auth(s.UpdateSettings))
 	s.mux.HandleFunc("/api/v1/system/upgrade", s.auth(s.Upgrade))
 	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
+	s.mux.HandleFunc("/api/v1/qrcode/subscribe", s.auth(s.SubscribeQRCode))
+	s.mux.HandleFunc("/api/v1/qrcode/node/", s.auth(s.NodeQRCode))
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
 	s.mux.HandleFunc("/api/v1/nodes/add", s.auth(s.AddNode))
 	s.mux.HandleFunc("/api/v1/nodes/remove", s.auth(s.RemoveNode))
@@ -621,6 +625,58 @@ func (s *Server) Subscribe(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte(subscribe.V2rayN(st.Nodes)))
+}
+
+func (s *Server) SubscribeQRCode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		method(w)
+		return
+	}
+	st := s.store.Snapshot()
+	scheme := "http"
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		scheme = "https"
+	}
+	host := r.Host
+	if forwardedHost := strings.TrimSpace(r.Header.Get("X-Forwarded-Host")); forwardedHost != "" {
+		host = forwardedHost
+	}
+	writeQRCode(w, scheme+"://"+host+"/api/v1/subscribe/"+st.SubscribeKey)
+}
+
+func (s *Server) NodeQRCode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		method(w)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/qrcode/node/")
+	st := s.store.Snapshot()
+	for _, n := range st.Nodes {
+		if n.ID == id {
+			link := n.SubscribeLink
+			if link == "" && n.Status == "running" {
+				link = subscribe.Link(n)
+			}
+			if link == "" {
+				writeError(w, http.StatusBadRequest, errors.New("node link unavailable"))
+				return
+			}
+			writeQRCode(w, link)
+			return
+		}
+	}
+	http.NotFound(w, r)
+}
+
+func writeQRCode(w http.ResponseWriter, text string) {
+	png, err := qrcode.Encode(text, qrcode.Medium, 260)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "private, max-age=300")
+	_, _ = w.Write(png)
 }
 
 func (s *Server) GenerateCode(w http.ResponseWriter, r *http.Request) {
