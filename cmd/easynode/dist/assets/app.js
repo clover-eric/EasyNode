@@ -76,6 +76,8 @@ const copyText = {
     stopped: "已停止",
     mainstreamClients: "主流客户端",
     latency: "延迟",
+    mainlandLatency: "大陆延迟",
+    peerLatency: "两机延迟",
     port: "端口",
     traffic: "流量",
     score: "推荐",
@@ -190,6 +192,8 @@ const copyText = {
     stopped: "Stopped",
     mainstreamClients: "mainstream clients",
     latency: "Latency",
+    mainlandLatency: "Mainland latency",
+    peerLatency: "Peer latency",
     port: "Port",
     traffic: "Traffic",
     score: "Score",
@@ -430,7 +434,8 @@ function chainPeersHTML() {
     const name = shortPeerName(p.name, endpoint);
     const status = p.remote_pairing_disabled ? t("remotePairingClosed") : (p.status === "paired" ? t("paired") : esc(p.status || "-"));
     const tone = p.remote_pairing_disabled ? "warn" : "";
-    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)}</span></div><span class="chainPeerActions"><em class="${tone}">${status}</em><button class="btn ghost" data-unpair="${esc(p.id)}">${t("unpair")}</button></span></div>`;
+    const latency = p.remote_latency_ms ? `${p.remote_latency_ms}ms ${t("peerLatency")}` : `- ${t("peerLatency")}`;
+    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)} · ${esc(latency)}</span></div><span class="chainPeerActions"><em class="${tone}">${status}</em><button class="btn ghost" data-unpair="${esc(p.id)}">${t("unpair")}</button></span></div>`;
   }).join("");
 }
 
@@ -439,7 +444,8 @@ function chainClientsSectionHTML() {
   if (!clients.length) return "";
   return `<div class="sectionTitle"><span>${t("pairedBy")}</span></div><div class="chainPeers">${clients.map(c => {
     const endpoint = c.endpoint || "-";
-    return `<div class="chainPeer"><div><b>${esc(c.name || ("Entry " + shortHost(endpoint)))}</b><span>${esc(shortHost(endpoint))}</span></div><span class="chainPeerActions"><em>${c.status === "paired" ? t("paired") : esc(c.status || "-")}</em><button class="btn ghost" data-unpair-client="${esc(c.id)}">${t("unpair")}</button></span></div>`;
+    const latency = c.remote_latency_ms ? `${c.remote_latency_ms}ms ${t("peerLatency")}` : `- ${t("peerLatency")}`;
+    return `<div class="chainPeer"><div><b>${esc(c.name || ("Entry " + shortHost(endpoint)))}</b><span>${esc(shortHost(endpoint))} · ${esc(latency)}</span></div><span class="chainPeerActions"><em>${c.status === "paired" ? t("paired") : esc(c.status || "-")}</em><button class="btn ghost" data-unpair-client="${esc(c.id)}">${t("unpair")}</button></span></div>`;
   }).join("")}</div>`;
 }
 
@@ -844,7 +850,7 @@ function nodeCard(n) {
     <div class="cardHead"><div class="status"><i class="dot"></i>${n.status === "running" ? t("running") : t("stopped")}</div><span class="badge starBadge">${stars(p.score)}</span></div>
     <div class="proto">${p.title}</div><p class="desc">${p.summary}</p>
     <div class="miniInfo">${p.protocol} · ${p.clients || t("mainstreamClients")}</div>
-    <div class="stats"><div class="stat"><b>${n.latency_ms ?? "-"}ms</b><span>${t("latency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${formatBytes(n.traffic_used || 0)}</b><span>${t("traffic")}</span></div></div>
+    <div class="stats"><div class="stat"><b>${n.latency_ms ? `${n.latency_ms}ms` : "-"}</b><span>${t("mainlandLatency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${formatBytes(n.traffic_used || 0)}</b><span>${t("traffic")}</span></div></div>
     <div class="row">${copyButton}${qrButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
   </article>`;
 }

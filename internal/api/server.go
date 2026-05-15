@@ -353,45 +353,55 @@ func (s *Server) IPPurity(w http.ResponseWriter, r *http.Request) {
 func (s *Server) enrichedState() model.AppState {
 	st := s.store.Snapshot()
 	bytesByPort := traffic.PortBytes()
+	mainlandLatency := detector.MainlandLatency()
 	for i := range st.Nodes {
 		st.Nodes[i].TrafficUsed = bytesByPort[st.Nodes[i].Port]
 		if st.Nodes[i].Status == "running" {
-			st.Nodes[i].LatencyMS = detector.LocalPortLatency(st.Nodes[i].Port, st.Nodes[i].Transport)
+			st.Nodes[i].LatencyMS = mainlandLatency
 		} else {
 			st.Nodes[i].LatencyMS = nil
 		}
 	}
 	for i := range st.ChainPeers {
-		disabled, checked := remotePairingDisabled(st.ChainPeers[i].Endpoint)
+		disabled, checked, latency := remotePairingDisabled(st.ChainPeers[i].Endpoint)
 		st.ChainPeers[i].RemotePairingDisabled = disabled
 		st.ChainPeers[i].RemoteStatusCheckedAt = checked
+		st.ChainPeers[i].RemoteLatencyMS = latency
+	}
+	for i := range st.ChainClients {
+		st.ChainClients[i].RemoteLatencyMS = detector.EndpointLatency(st.ChainClients[i].Endpoint)
 	}
 	return st
 }
 
-func remotePairingDisabled(endpoint string) (bool, time.Time) {
+func remotePairingDisabled(endpoint string) (bool, time.Time, *int) {
 	u, err := url.Parse(endpoint)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return false, time.Time{}
+		return false, time.Time{}, nil
 	}
 	u.Path = "/api/v1/chain/public/status"
 	u.RawQuery = ""
 	client := http.Client{Timeout: 2 * time.Second}
+	start := time.Now()
 	resp, err := client.Get(u.String())
 	if err != nil {
-		return false, time.Time{}
+		return false, time.Time{}, nil
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return false, time.Time{}
+		return false, time.Time{}, nil
 	}
 	var out struct {
 		PairingDisabled bool `json:"pairing_disabled"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return false, time.Time{}
+		return false, time.Time{}, nil
 	}
-	return out.PairingDisabled, time.Now()
+	ms := int(time.Since(start).Milliseconds())
+	if ms < 1 {
+		ms = 1
+	}
+	return out.PairingDisabled, time.Now(), &ms
 }
 
 func (s *Server) Nodes(w http.ResponseWriter, r *http.Request) {
