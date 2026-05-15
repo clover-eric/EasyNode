@@ -311,8 +311,8 @@ function renderSetup(setup) {
         ip_direct: $("#ipDirect").checked,
         protocols
       })});
-      if (!$("#ipDirect").checked && $("#domain").value.trim() && location.hostname !== $("#domain").value.trim()) {
-        location.href = `${location.protocol}//${$("#domain").value.trim()}:8088`;
+      if (state.panel_url) {
+        location.href = state.panel_url;
         return;
       }
       renderDashboard();

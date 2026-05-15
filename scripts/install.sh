@@ -8,6 +8,7 @@ BIN="/usr/local/bin/easynode"
 SERVICE="/etc/systemd/system/easynode.service"
 SING_BOX_SERVICE="/etc/systemd/system/easynode-singbox.service"
 PORT="8088"
+TLS_PORT="8443"
 ASSUME_YES="0"
 DO_UPGRADE="ask"
 DO_DEPS="ask"
@@ -172,9 +173,11 @@ open_firewall() {
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi active; then
     ufw allow "80/tcp" || true
     ufw allow "${PORT}/tcp" || true
+    ufw allow "${TLS_PORT}/tcp" || true
   elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
     firewall-cmd --permanent --add-port="80/tcp" || true
     firewall-cmd --permanent --add-port="${PORT}/tcp" || true
+    firewall-cmd --permanent --add-port="${TLS_PORT}/tcp" || true
     firewall-cmd --reload || true
   else
     warn "No active ufw/firewalld detected, skip firewall rule"
@@ -308,7 +311,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=$BIN -addr :$PORT -data $DATA_DIR
+ExecStart=$BIN -addr :$PORT -tls-addr :$TLS_PORT -data $DATA_DIR
 Restart=always
 RestartSec=3
 User=root
@@ -396,6 +399,9 @@ EasyNode installed.
 Open this in your browser:
   http://${IP}:${PORT}
 
+After domain setup succeeds, EasyNode will open:
+  https://your-domain:${TLS_PORT}
+
 Useful commands:
   systemctl status easynode
   journalctl -u easynode -f
@@ -407,5 +413,5 @@ Next:
   3. Enter domain or choose IP direct mode.
   4. Keep recommended node plans unless you know what to change.
 
-If the browser cannot open it, check your cloud firewall/security group allows TCP ${PORT}.
+If the browser cannot open it, check your cloud firewall/security group allows TCP ${PORT} and ${TLS_PORT}.
 EOF

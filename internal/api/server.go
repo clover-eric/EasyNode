@@ -60,6 +60,10 @@ func (s *Server) Handler() http.Handler {
 	return s.mux
 }
 
+func (s *Server) StateSnapshot() model.AppState {
+	return s.store.Snapshot()
+}
+
 func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/setup/status", s.SetupStatus)
 	s.mux.HandleFunc("/api/v1/setup", s.Setup)
@@ -160,7 +164,8 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 	_ = singbox.RestartService()
 	setSession(w, st.SessionToken)
-	writeJSON(w, http.StatusOK, publicState(st))
+	resp := publicState(st)
+	writeJSON(w, http.StatusOK, withPanelURL(resp))
 }
 
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
@@ -962,6 +967,16 @@ func publicState(st model.AppState) model.AppState {
 	st.LockoutUntil = time.Time{}
 	st.PairingCodes = nil
 	return st
+}
+
+func withPanelURL(st model.AppState) map[string]any {
+	b, _ := json.Marshal(st)
+	var out map[string]any
+	_ = json.Unmarshal(b, &out)
+	if !st.IPDirect && st.Domain != "" && st.CertReady {
+		out["panel_url"] = "https://" + st.Domain + ":8443" + st.PanelPath
+	}
+	return out
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

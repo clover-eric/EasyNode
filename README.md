@@ -42,9 +42,9 @@ curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/i
 - 创建数据目录并设置权限
 - 安装 systemd 服务
 - 设置开机自启
-- 在启用 `ufw` 或 `firewalld` 时开放面板端口
+- 在启用 `ufw` 或 `firewalld` 时开放 HTTP 面板端口 `8088` 和 HTTPS 面板端口 `8443`
 - 启动后自检服务是否可用
-- 只输出一个浏览器访问地址
+- 先输出 IP 访问地址；首次域名部署并签发证书后，页面会自动跳转到 `https://你的域名:8443`
 
 常用参数：
 
