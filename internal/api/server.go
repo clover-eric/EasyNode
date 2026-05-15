@@ -907,8 +907,8 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		st := s.store.Snapshot()
 		_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 		_ = singbox.RestartService()
-		go notifyExitPaired(bundle, req.Endpoint, req.PublicKey)
-		writeJSON(w, http.StatusOK, map[string]any{"peer_public_key": bundle.PublicKey, "peer_endpoint": bundle.Endpoint, "tunnel_config": bundle})
+		notified, notifyErr := notifyExitPaired(bundle, req.Endpoint, req.PublicKey)
+		writeJSON(w, http.StatusOK, map[string]any{"peer_public_key": bundle.PublicKey, "peer_endpoint": bundle.Endpoint, "tunnel_config": bundle, "exit_notified": notified, "exit_notify_error": notifyErr})
 		return
 	}
 	var paired model.PairingCode
@@ -1024,19 +1024,27 @@ func upsertChainClient(st *model.AppState, client model.ChainClient) {
 	st.ChainClients = append(st.ChainClients, client)
 }
 
-func notifyExitPaired(bundle chain.Bundle, endpoint, publicKey string) {
+func notifyExitPaired(bundle chain.Bundle, endpoint, publicKey string) (bool, string) {
 	u, err := url.Parse(bundle.Endpoint)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return
+		return false, "invalid exit endpoint"
 	}
 	u.Path = "/api/v1/chain/public/paired"
 	u.RawQuery = ""
 	body, _ := json.Marshal(map[string]string{"code": bundle.Code, "endpoint": endpoint, "public_key": publicKey})
 	client := http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
-	if err == nil && resp != nil {
-		_ = resp.Body.Close()
+	if err != nil {
+		return false, err.Error()
 	}
+	if resp == nil {
+		return false, "empty response"
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return false, "exit returned " + resp.Status
+	}
+	return true, ""
 }
 
 func chainPeerName(displayName, endpoint string) string {
