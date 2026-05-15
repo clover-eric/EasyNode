@@ -581,6 +581,45 @@ function stripAnsi(text) {
   return String(text || "").replace(/\x1b\[[0-9;]*m/g, "");
 }
 
+const purityI18n = {
+  zh: {
+    clean: "较干净",
+    medium: "中等",
+    risky: "风险较高",
+    unknown: "未知",
+    "datacenter": "机房 / VPS",
+    "mobile": "移动网络",
+    "residential/isp-like": "住宅 / 运营商倾向",
+    "likely native": "较可能原生",
+    "uncertain": "不确定",
+    "likely proxy/broadcast": "疑似代理 / 广播",
+    "data center / hosting ASN": "机房或托管 ASN",
+    "proxy/VPN risk flag": "存在代理 / VPN 风险标记",
+    "provider name looks like hosting": "服务商名称疑似机房",
+    "reputation API unreachable": "纯净度接口暂时不可达",
+    "reputation API returned no result": "纯净度接口没有返回结果",
+    "AI / ChatGPT": "AI / ChatGPT",
+    "Streaming": "流媒体",
+    "Account registration": "账号注册",
+    "Daily browsing": "日常浏览",
+    good: "适合",
+    usable: "可用",
+    limited: "可能受限",
+    caution: "谨慎使用",
+    "Sensitive to proxy and abuse reputation": "对代理和滥用信誉较敏感",
+    "Datacenter IPs may hit region or proxy checks": "机房 IP 可能触发地区或代理检测",
+    "New accounts prefer clean ISP-like IPs": "新账号更适合干净的运营商倾向 IP",
+    "Most sites tolerate normal VPS traffic": "大多数网站可接受普通 VPS 流量",
+    "No obvious risk flag": "未发现明显风险标记"
+  },
+  en: {}
+};
+
+function pt(value) {
+  if (lang !== "zh") return value;
+  return purityI18n.zh[value] || value;
+}
+
 function nodeCard(n) {
   const p = profile(n.protocol);
   const canCopy = n.status === "running" && n.subscribe_link;
@@ -618,11 +657,11 @@ async function showPurity() {
   try {
     const r = await api("/api/v1/ip/purity");
     $("#purityBody").innerHTML = `<div class="purityGrid">
-      <div class="purityMain"><div class="purityScore">${r.score}<span>/100</span></div><p>${r.level || ""} · ${r.ip || ""}</p><p>${r.country || ""} ${r.asn || ""}</p><p>${r.isp || ""}</p></div>
-      <div class="purityMeta"><b>${t("ipType")}</b><span>${r.ip_type || "-"}</span></div>
-      <div class="purityMeta"><b>${t("nativeCheck")}</b><span>${r.native || "-"}</span></div>
-      <div class="purityMeta wide"><b>${t("risks")}</b><span>${(r.risks || []).join("<br>") || "No obvious risk flag"}</span></div>
-      <div class="purityMeta wide"><b>${t("useCases")}</b>${(r.use_cases || []).map(x => `<span>${x.name}: ${x.status} - ${x.reason}</span>`).join("")}</div>
+      <div class="purityMain"><div class="purityScore">${r.score}<span>/100</span></div><p>${pt(r.level || "")} · ${r.ip || ""}</p><p>${r.country || ""} ${r.asn || ""}</p><p>${r.isp || ""}</p></div>
+      <div class="purityMeta"><b>${t("ipType")}</b><span>${pt(r.ip_type || "-")}</span></div>
+      <div class="purityMeta"><b>${t("nativeCheck")}</b><span>${pt(r.native || "-")}</span></div>
+      <div class="purityMeta wide"><b>${t("risks")}</b><span>${(r.risks || []).map(pt).join("<br>") || pt("No obvious risk flag")}</span></div>
+      <div class="purityMeta wide"><b>${t("useCases")}</b>${(r.use_cases || []).map(x => `<span>${pt(x.name)}: ${pt(x.status)} - ${pt(x.reason)}</span>`).join("")}</div>
     </div>`;
   } catch (e) {
     $("#purityBody").textContent = e.message;
