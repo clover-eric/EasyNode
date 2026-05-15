@@ -444,6 +444,20 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusAccepted, s.upgradeSnapshot())
 		return
 	}
+	s.upgrade.mu.Unlock()
+
+	info := s.checkUpdateInfo()
+	if info.Error == "" && info.LatestCommit != "" && !info.UpdateAvailable {
+		writeError(w, http.StatusConflict, errors.New("already latest version"))
+		return
+	}
+
+	s.upgrade.mu.Lock()
+	if s.upgrade.Running {
+		s.upgrade.mu.Unlock()
+		writeJSON(w, http.StatusAccepted, s.upgradeSnapshot())
+		return
+	}
 	s.upgrade.Running = true
 	s.upgrade.Progress = 5
 	s.upgrade.Step = "preparing backup"
@@ -482,12 +496,15 @@ type updateNote struct {
 }
 
 func (s *Server) UpdateInfo(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.checkUpdateInfo())
+}
+
+func (s *Server) checkUpdateInfo() updateInfo {
 	info := updateInfo{CurrentCommit: s.build.Commit}
 	commits, err := fetchGitHubCommits()
 	if err != nil {
 		info.Error = err.Error()
-		writeJSON(w, http.StatusOK, info)
-		return
+		return info
 	}
 	if len(commits) > 0 {
 		info.LatestCommit = commits[0].Commit
@@ -502,7 +519,7 @@ func (s *Server) UpdateInfo(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, info)
+	return info
 }
 
 func fetchGitHubCommits() ([]updateNote, error) {

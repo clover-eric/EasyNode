@@ -101,6 +101,7 @@ const copyText = {
     newPassword: "新密码（可留空）",
     saveSettings: "保存设置",
     onlineUpgrade: "在线升级",
+    alreadyLatest: "已是最新版本",
     upgradeTip: "升级会先备份配置，过程中面板可能短暂断开。建议在业务低峰操作。",
     upgradeConfirmTitle: "确认在线升级",
     upgradeConfirmText: "系统会先备份配置，然后拉取最新版本并重启服务。升级期间面板可能短暂断开。",
@@ -214,6 +215,7 @@ const copyText = {
     newPassword: "New password (optional)",
     saveSettings: "Save settings",
     onlineUpgrade: "Online upgrade",
+    alreadyLatest: "Already latest",
     upgradeTip: "Upgrade creates a backup first. The panel may disconnect briefly. Run it during low traffic hours.",
     upgradeConfirmTitle: "Confirm online upgrade",
     upgradeConfirmText: "EasyNode will back up config, pull the latest version, and restart services. The panel may disconnect briefly.",
@@ -662,6 +664,7 @@ function renderSettings() {
     }
   };
   $("#upgradeBtn").onclick = async () => {
+    if ($("#upgradeBtn").disabled) return;
     showUpgradeConfirm();
   };
   loadUpdateBox();
@@ -672,9 +675,20 @@ async function loadUpdateBox() {
   if (!box) return;
   try {
     const info = await api("/api/v1/system/update-info");
-    const title = info.update_available ? t("updateAvailable") : t("upgradeTip");
+    const upgradeBtn = $("#upgradeBtn");
+    const latestConfirmed = !info.update_available && !info.error && info.latest_commit;
+    if (upgradeBtn) {
+      upgradeBtn.disabled = !!latestConfirmed;
+      upgradeBtn.textContent = latestConfirmed ? t("alreadyLatest") : t("onlineUpgrade");
+    }
+    const title = info.update_available ? t("updateAvailable") : (latestConfirmed ? t("alreadyLatest") : t("upgradeTip"));
     box.innerHTML = `<b>${title}</b><span>${t("updateCurrent")}: ${info.current_commit || "dev"} · ${t("updateLatest")}: ${info.latest_commit || "-"}</span>${updateNotesHTML(info.notes || [])}${info.error ? `<span>${t("updateCheckFailed")}: ${esc(info.error)}</span>` : ""}`;
   } catch (e) {
+    const upgradeBtn = $("#upgradeBtn");
+    if (upgradeBtn) {
+      upgradeBtn.disabled = false;
+      upgradeBtn.textContent = t("onlineUpgrade");
+    }
     box.textContent = `${t("updateCheckFailed")}: ${e.message || ""}`;
   }
 }
