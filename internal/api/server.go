@@ -67,6 +67,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/system/upgrade", s.auth(s.Upgrade))
 	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
+	s.mux.HandleFunc("/api/v1/nodes/add", s.auth(s.AddNode))
 	s.mux.HandleFunc("/api/v1/nodes/", s.auth(s.NodeAction))
 	s.mux.HandleFunc("/api/v1/subscribe/", s.Subscribe)
 	s.mux.HandleFunc("/api/v1/chain/generate-code", s.auth(s.GenerateCode))
@@ -213,6 +214,54 @@ func (s *Server) State(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Nodes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.store.Snapshot().Nodes)
+}
+
+func (s *Server) AddNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var req struct {
+		Protocol string `json:"protocol"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	recs := recommender.Recommend(model.Environment{HasIPv4: true, UDPAvailable: true, TLSReady: true})
+	var rec *model.Recommendation
+	for i := range recs {
+		if recs[i].Protocol == req.Protocol {
+			rec = &recs[i]
+			break
+		}
+	}
+	if rec == nil {
+		writeError(w, http.StatusBadRequest, errors.New("unknown protocol"))
+		return
+	}
+	err := s.store.Update(func(st *model.AppState) error {
+		for _, n := range st.Nodes {
+			if n.Protocol == req.Protocol {
+				return errors.New("protocol already added")
+			}
+		}
+		host := st.Domain
+		if st.IPDirect || host == "" {
+			host = "127.0.0.1"
+		}
+		node := newNodeFromRecommendation(*rec, host, st.CertReady)
+		st.Nodes = append(st.Nodes, node)
+		return nil
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	st := s.store.Snapshot()
+	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
+	_ = singbox.RestartService()
+	writeJSON(w, http.StatusOK, publicState(st))
 }
 
 func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) {
@@ -543,7 +592,6 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 	if ipDirect || host == "" {
 		host = "127.0.0.1"
 	}
-	ports := map[string]int{"vless-reality": 443, "hysteria2": 8443, "trojan-tls": 2053, "vless-ws-tls": 2083, "tuic": 9443}
 	nodes := []model.Node{}
 	for _, rec := range recs {
 		enabled := rec.Enabled
@@ -553,27 +601,34 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 		if !enabled {
 			continue
 		}
-		n := model.Node{
-			ID: rec.Protocol, Protocol: rec.Protocol, Transport: rec.Transport, Security: rec.Security,
-			Label: rec.Label, Description: rec.Description, Priority: rec.Priority, Status: "running",
-			Port: ports[rec.Protocol], UUID: util.UUID(), Password: util.Token(12), Host: host, CreatedAt: time.Now(),
-		}
-		if n.Protocol == "vless-reality" {
-			m := singbox.GenerateRealityMaterial()
-			n.RealityPrivateKey = m.PrivateKey
-			n.RealityPublicKey = m.PublicKey
-			n.RealityShortID = m.ShortID
-		} else if !protocolRunnable(n.Protocol, certReady) {
-			n.Status = "stopped"
-		}
+		n := newNodeFromRecommendation(rec, host, certReady)
 		lat := 18 + len(nodes)*11
 		n.LatencyMS = &lat
-		if n.Status == "running" {
-			n.SubscribeLink = subscribe.Link(n)
-		}
 		nodes = append(nodes, n)
 	}
 	return nodes
+}
+
+func newNodeFromRecommendation(rec model.Recommendation, host string, certReady bool) model.Node {
+	ports := map[string]int{"vless-reality": 443, "hysteria2": 8443, "trojan-tls": 2053, "vless-ws-tls": 2083, "tuic": 9443}
+	n := model.Node{
+		ID: rec.Protocol, Protocol: rec.Protocol, Transport: rec.Transport, Security: rec.Security,
+		Label: rec.Label, Description: rec.Description, Priority: rec.Priority, Status: "running",
+		Port: ports[rec.Protocol], UUID: util.UUID(), Password: util.Token(12), Host: host, CreatedAt: time.Now(),
+	}
+	if n.Protocol == "vless-reality" {
+		m := singbox.GenerateRealityMaterial()
+		n.RealityPrivateKey = m.PrivateKey
+		n.RealityPublicKey = m.PublicKey
+		n.RealityShortID = m.ShortID
+	}
+	if !protocolRunnable(n.Protocol, certReady) {
+		n.Status = "stopped"
+	}
+	if n.Status == "running" {
+		n.SubscribeLink = subscribe.Link(n)
+	}
+	return n
 }
 
 func protocolRunnable(protocol string, certReady bool) bool {

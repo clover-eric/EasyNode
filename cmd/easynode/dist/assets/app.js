@@ -38,6 +38,9 @@ const copyText = {
     protocolLibrary: "协议库",
     availableNow: "可立即使用",
     comingSoon: "输入域名并签发证书后可用",
+    added: "已添加",
+    add: "添加",
+    addSuccess: "协议已添加",
     config: "sing-box 配置",
     logout: "退出",
     chainProxy: "链式代理",
@@ -113,6 +116,9 @@ const copyText = {
     protocolLibrary: "Protocol library",
     availableNow: "Available now",
     comingSoon: "Available after domain certificate is issued",
+    added: "Added",
+    add: "Add",
+    addSuccess: "Protocol added",
     config: "sing-box config",
     logout: "Log out",
     chainProxy: "Chain proxy",
@@ -398,7 +404,7 @@ function renderProtocolLibrary() {
     <div class="dialogHead"><div><h2>${t("protocolLibrary")}</h2><p>${t("setupHintText")}</p></div><button class="btn ghost" id="closeProtocols">${t("cancel")}</button></div>
     <div class="protocolGrid" style="margin-top:14px">${allProfiles().map(([id, p]) => {
       const exists = state.nodes.some(n => n.protocol === id);
-      const ready = id === "vless-reality";
+      const ready = id === "vless-reality" || (!state.ip_direct && state.cert_ready);
       return `<div class="protocolOption ${exists ? "exists" : ""}">
         <span></span><span class="optionBody">
           <span class="optionTop"><strong>${p.title}</strong><em>${stars(p.score)}</em></span>
@@ -406,13 +412,25 @@ function renderProtocolLibrary() {
           <span class="optionText">${p.summary}</span>
           <span class="optionMeta"><b>${t("bestFor")}</b>${p.bestFor}</span>
           <span class="optionTrade">${ready ? t("availableNow") : t("comingSoon")}</span>
-          <button class="btn" disabled>${exists ? t("settings") : (ready ? t("availableNow") : t("comingSoon"))}</button>
+          <button class="btn" ${exists || !ready ? "disabled" : ""} data-add-protocol="${id}">${exists ? t("added") : (ready ? t("add") : t("comingSoon"))}</button>
         </span>
       </div>`;
     }).join("")}</div>
   </div>`;
   document.body.appendChild(modal);
   $("#closeProtocols").onclick = () => modal.remove();
+  modal.querySelectorAll("[data-add-protocol]").forEach(btn => btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      state = await api("/api/v1/nodes/add", { method: "POST", body: JSON.stringify({ protocol: btn.dataset.addProtocol }) });
+      toast(t("addSuccess"));
+      modal.remove();
+      renderDashboard();
+    } catch (e) {
+      toast(e.message);
+      btn.disabled = false;
+    }
+  });
 }
 
 function renderSettings() {
