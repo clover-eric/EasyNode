@@ -52,6 +52,7 @@ const copyText = {
     stop: "停止",
     start: "启动",
     copied: "已复制",
+    copyFailed: "复制失败，请长按或手动复制",
     language: "English",
     settingsTitle: "系统设置",
     currentPassword: "当前密码",
@@ -108,6 +109,7 @@ const copyText = {
     stop: "Stop",
     start: "Start",
     copied: "Copied",
+    copyFailed: "Copy failed. Please copy manually.",
     language: "中文",
     settingsTitle: "System settings",
     currentPassword: "Current password",
@@ -284,7 +286,7 @@ function renderDashboard() {
   </main>`;
   $("#langBtn").onclick = switchLang;
   $("#settingsBtn").onclick = renderSettings;
-  $("#copySub").onclick = () => copy(sub);
+  $("#copySub").onclick = () => copy(sub, $("#copySub"));
   $("#downloadCfg").onclick = () => location.href = "/api/v1/sing-box/config";
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
   $("#genCode").onclick = async () => {
@@ -301,7 +303,10 @@ function renderDashboard() {
       toast(e.message);
     }
   };
-  document.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copy(b.dataset.copy));
+  document.querySelectorAll("[data-node-copy]").forEach(b => b.onclick = () => {
+    const n = state.nodes.find(x => x.id === b.dataset.nodeCopy);
+    copy(n?.subscribe_link || "", b);
+  });
   document.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => {
     state.nodes = await api(`/api/v1/nodes/${b.dataset.toggle}/toggle`, { method: "POST" });
     state = await api("/api/v1/state");
@@ -362,13 +367,70 @@ function nodeCard(n) {
     <div class="proto">${p.title}</div><p class="desc">${p.summary}</p>
     <div class="miniInfo">${p.protocol} · ${p.clients || t("mainstreamClients")}</div>
     <div class="stats"><div class="stat"><b>${n.latency_ms ?? "-"}ms</b><span>${t("latency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${used}M</b><span>${t("traffic")}</span></div></div>
-    <div class="row"><button class="btn" data-copy="${n.subscribe_link}">${t("copyLink")}</button><button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
+    <div class="row"><button class="btn" data-node-copy="${n.id}">${t("copyLink")}</button><button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
   </article>`;
 }
 
-async function copy(text) {
-  await navigator.clipboard.writeText(text);
-  toast(t("copied"));
+async function copy(text, button) {
+  if (!text) {
+    toast(t("copyFailed"));
+    return;
+  }
+  const ok = await writeClipboard(text);
+  if (ok) {
+    toast(t("copied"));
+    pulseButton(button, t("copied"));
+  } else {
+    showCopyFallback(text);
+    toast(t("copyFailed"));
+  }
+}
+
+async function writeClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {}
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  ta.style.top = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    ta.remove();
+  }
+}
+
+function pulseButton(button, text) {
+  if (!button) return;
+  const old = button.textContent;
+  button.textContent = text;
+  button.classList.add("success");
+  setTimeout(() => {
+    button.textContent = old;
+    button.classList.remove("success");
+  }, 1100);
+}
+
+function showCopyFallback(text) {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `<div class="dialog"><div class="dialogHead"><div><h2>${t("copyLink")}</h2><p>${t("copyFailed")}</p></div><button class="btn ghost" id="closeCopy">${t("cancel")}</button></div><textarea class="copyBox" readonly>${text}</textarea></div>`;
+  document.body.appendChild(modal);
+  $("#closeCopy").onclick = () => modal.remove();
+  const box = modal.querySelector(".copyBox");
+  box.focus();
+  box.select();
 }
 
 boot().catch(e => {
