@@ -70,6 +70,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
 	s.mux.HandleFunc("/api/v1/nodes/add", s.auth(s.AddNode))
+	s.mux.HandleFunc("/api/v1/nodes/remove", s.auth(s.RemoveNode))
 	s.mux.HandleFunc("/api/v1/nodes/", s.auth(s.NodeAction))
 	s.mux.HandleFunc("/api/v1/subscribe/", s.Subscribe)
 	s.mux.HandleFunc("/api/v1/chain/generate-code", s.auth(s.GenerateCode))
@@ -272,6 +273,44 @@ func (s *Server) AddNode(w http.ResponseWriter, r *http.Request) {
 		}
 		node := newNodeFromRecommendation(*rec, host, st.CertReady)
 		st.Nodes = append(st.Nodes, node)
+		return nil
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	st := s.store.Snapshot()
+	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
+	_ = singbox.RestartService()
+	writeJSON(w, http.StatusOK, publicState(st))
+}
+
+func (s *Server) RemoveNode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var req struct {
+		Protocol string `json:"protocol"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	err := s.store.Update(func(st *model.AppState) error {
+		next := st.Nodes[:0]
+		removed := false
+		for _, n := range st.Nodes {
+			if n.Protocol == req.Protocol {
+				removed = true
+				continue
+			}
+			next = append(next, n)
+		}
+		if !removed {
+			return errors.New("protocol not found")
+		}
+		st.Nodes = next
 		return nil
 	})
 	if err != nil {

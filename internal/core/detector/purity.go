@@ -14,6 +14,7 @@ type PurityReport struct {
 	IPType      string    `json:"ip_type"`
 	Native      string    `json:"native"`
 	Country     string    `json:"country,omitempty"`
+	CountryCode string    `json:"country_code,omitempty"`
 	ASN         string    `json:"asn,omitempty"`
 	ISP         string    `json:"isp,omitempty"`
 	Risks       []string  `json:"risks"`
@@ -31,21 +32,22 @@ type UseCase struct {
 func CheckPurity() PurityReport {
 	report := PurityReport{Score: 70, Level: "unknown", IPType: "unknown", Native: "unknown", CheckedAt: time.Now().Format(time.RFC3339), Explanation: "Basic public IP reputation heuristic"}
 	client := http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get("http://ip-api.com/json/?fields=status,query,country,as,isp,hosting,proxy,mobile")
+	resp, err := client.Get("http://ip-api.com/json/?fields=status,query,country,countryCode,as,isp,hosting,proxy,mobile")
 	if err != nil {
 		report.Risks = append(report.Risks, "reputation API unreachable")
 		return report
 	}
 	defer resp.Body.Close()
 	var data struct {
-		Status  string `json:"status"`
-		Query   string `json:"query"`
-		Country string `json:"country"`
-		AS      string `json:"as"`
-		ISP     string `json:"isp"`
-		Hosting bool   `json:"hosting"`
-		Proxy   bool   `json:"proxy"`
-		Mobile  bool   `json:"mobile"`
+		Status      string `json:"status"`
+		Query       string `json:"query"`
+		Country     string `json:"country"`
+		CountryCode string `json:"countryCode"`
+		AS          string `json:"as"`
+		ISP         string `json:"isp"`
+		Hosting     bool   `json:"hosting"`
+		Proxy       bool   `json:"proxy"`
+		Mobile      bool   `json:"mobile"`
 	}
 	if json.NewDecoder(resp.Body).Decode(&data) != nil || data.Status != "success" {
 		report.Risks = append(report.Risks, "reputation API returned no result")
@@ -53,6 +55,7 @@ func CheckPurity() PurityReport {
 	}
 	report.IP = data.Query
 	report.Country = data.Country
+	report.CountryCode = data.CountryCode
 	report.ASN = data.AS
 	report.ISP = data.ISP
 	score := 88

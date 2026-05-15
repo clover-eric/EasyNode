@@ -40,6 +40,8 @@ const copyText = {
     comingSoon: "输入域名并签发证书后可用",
     added: "已添加",
     add: "添加",
+    remove: "移除",
+    removeSuccess: "协议已移除",
     addSuccess: "协议已添加",
     config: "sing-box 配置",
     logout: "退出",
@@ -131,6 +133,8 @@ const copyText = {
     comingSoon: "Available after domain certificate is issued",
     added: "Added",
     add: "Add",
+    remove: "Remove",
+    removeSuccess: "Protocol removed",
     addSuccess: "Protocol added",
     config: "sing-box config",
     logout: "Log out",
@@ -438,12 +442,12 @@ function renderProtocolLibrary() {
       const ready = id === "vless-reality" || (!state.ip_direct && state.cert_ready);
       return `<div class="protocolOption ${exists ? "exists" : ""}">
         <span></span><span class="optionBody">
-          <span class="optionTop"><strong>${p.title}</strong><em>${stars(p.score)}</em></span>
+          <span class="optionTop"><strong>${p.title}</strong><em class="starBadge">${stars(p.score)}</em></span>
           <span class="optionProtocol">${p.protocol}</span>
           <span class="optionText">${p.summary}</span>
           <span class="optionMeta"><b>${t("bestFor")}</b>${p.bestFor}</span>
           <span class="optionTrade">${ready ? t("availableNow") : t("comingSoon")}</span>
-          <button class="btn" ${exists || !ready ? "disabled" : ""} data-add-protocol="${id}">${exists ? t("added") : (ready ? t("add") : t("comingSoon"))}</button>
+          ${exists ? `<button class="btn" data-remove-protocol="${id}">${t("remove")}</button>` : `<button class="btn" ${!ready ? "disabled" : ""} data-add-protocol="${id}">${ready ? t("add") : t("comingSoon")}</button>`}
         </span>
       </div>`;
     }).join("")}</div>
@@ -455,6 +459,18 @@ function renderProtocolLibrary() {
     try {
       state = await api("/api/v1/nodes/add", { method: "POST", body: JSON.stringify({ protocol: btn.dataset.addProtocol }) });
       toast(t("addSuccess"));
+      modal.remove();
+      renderDashboard();
+    } catch (e) {
+      toast(e.message);
+      btn.disabled = false;
+    }
+  });
+  modal.querySelectorAll("[data-remove-protocol]").forEach(btn => btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      state = await api("/api/v1/nodes/remove", { method: "POST", body: JSON.stringify({ protocol: btn.dataset.removeProtocol }) });
+      toast(t("removeSuccess"));
       modal.remove();
       renderDashboard();
     } catch (e) {
@@ -615,9 +631,25 @@ const purityI18n = {
   en: {}
 };
 
+const countryZh = {
+  "United States": "美国", "Japan": "日本", "Singapore": "新加坡", "Hong Kong": "中国香港", "Taiwan": "中国台湾",
+  "South Korea": "韩国", "United Kingdom": "英国", "Germany": "德国", "France": "法国", "Canada": "加拿大",
+  "Australia": "澳大利亚", "Netherlands": "荷兰", "Russia": "俄罗斯", "China": "中国", "India": "印度",
+  "Thailand": "泰国", "Vietnam": "越南", "Malaysia": "马来西亚", "Indonesia": "印度尼西亚", "Philippines": "菲律宾"
+};
+
 function pt(value) {
   if (lang !== "zh") return value;
   return purityI18n.zh[value] || value;
+}
+
+function countryName(name) {
+  return lang === "zh" ? (countryZh[name] || name || "") : (name || "");
+}
+
+function flagEmoji(code) {
+  if (!code || code.length !== 2) return "";
+  return code.toUpperCase().replace(/./g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
 
 function nodeCard(n) {
@@ -657,7 +689,7 @@ async function showPurity() {
   try {
     const r = await api("/api/v1/ip/purity");
     $("#purityBody").innerHTML = `<div class="purityGrid">
-      <div class="purityMain"><div class="purityScore">${r.score}<span>/100</span></div><p>${pt(r.level || "")} · ${r.ip || ""}</p><p>${r.country || ""} ${r.asn || ""}</p><p>${r.isp || ""}</p></div>
+      <div class="purityMain"><div class="purityScore">${r.score}<span>/100</span></div><p>${pt(r.level || "")} · ${r.ip || ""}</p><p><span class="flag">${flagEmoji(r.country_code)}</span>${countryName(r.country)} ${r.asn || ""}</p><p>${r.isp || ""}</p></div>
       <div class="purityMeta"><b>${t("ipType")}</b><span>${pt(r.ip_type || "-")}</span></div>
       <div class="purityMeta"><b>${t("nativeCheck")}</b><span>${pt(r.native || "-")}</span></div>
       <div class="purityMeta wide"><b>${t("risks")}</b><span>${(r.risks || []).map(pt).join("<br>") || pt("No obvious risk flag")}</span></div>
