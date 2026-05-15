@@ -120,7 +120,7 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 	env := detector.Detect(req.Domain, req.IPDirect)
 	env.TLSReady = certReady
 	recs := recommender.Recommend(env)
-	nodes := nodesFromRecommendations(recs, req.Protocols, req.Domain, req.IPDirect)
+	nodes := nodesFromRecommendations(recs, req.Protocols, req.Domain, req.IPDirect, certReady)
 	hash, err := util.HashPassword(req.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -534,7 +534,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func nodesFromRecommendations(recs []model.Recommendation, selected []string, domain string, ipDirect bool) []model.Node {
+func nodesFromRecommendations(recs []model.Recommendation, selected []string, domain string, ipDirect bool, certReady bool) []model.Node {
 	want := map[string]bool{}
 	for _, p := range selected {
 		want[p] = true
@@ -563,7 +563,7 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 			n.RealityPrivateKey = m.PrivateKey
 			n.RealityPublicKey = m.PublicKey
 			n.RealityShortID = m.ShortID
-		} else if !protocolRunnable(n.Protocol, false) {
+		} else if !protocolRunnable(n.Protocol, certReady) {
 			n.Status = "stopped"
 		}
 		lat := 18 + len(nodes)*11

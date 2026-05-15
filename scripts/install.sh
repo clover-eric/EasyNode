@@ -46,6 +46,13 @@ Environment:
 EOF
 }
 
+STEP_NO=0
+TOTAL_STEPS=7
+step() {
+  STEP_NO=$((STEP_NO + 1))
+  printf '\n\033[1;36m[%d/%d]\033[0m \033[1m%s\033[0m\n' "$STEP_NO" "$TOTAL_STEPS" "$*"
+  printf '\033[2m%s\033[0m\n' "------------------------------------------------------------"
+}
 log() { printf '\033[1;32m[EasyNode]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[EasyNode]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[EasyNode]\033[0m %s\n' "$*" >&2; exit 1; }
@@ -327,25 +334,31 @@ cat <<EOF
 EOF
 
 if ask "Upgrade system packages?" "yes" "$DO_UPGRADE"; then
-  log "Upgrading system"
+  step "Preparing system packages"
   pkg_update
 fi
 
 if ask "Install common dependencies?" "yes" "$DO_DEPS"; then
-  log "Installing dependencies"
+  step "Installing common dependencies"
   pkg_deps
 fi
 
 if ask "Enable BBR network acceleration?" "yes" "$DO_BBR"; then
+  step "Optimizing network with BBR"
   enable_bbr
 fi
 
+step "Installing EasyNode panel"
 install_binary
+step "Installing sing-box core"
 install_sing_box
+step "Writing system services"
 write_service
+step "Checking panel health"
 wait_for_panel
 
 if ask "Open firewall port ${PORT}/tcp if firewall is active?" "yes" "$DO_FIREWALL"; then
+  step "Opening firewall ports"
   open_firewall
 fi
 

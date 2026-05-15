@@ -28,6 +28,8 @@ const copyText = {
     deploying: "部署中...",
     setupNotice: "不知道怎么选就保留默认：日常首选 + 高速传输 + 兼容优先。高级方案可以以后再开。",
     loginIntro: "输入管理员密码进入面板。",
+    securePanel: "安全面板",
+    securePanelText: "会话隔离、密码哈希、配置本机保存",
     loginButton: "进入面板",
     nodes: "个节点",
     copySub: "复制订阅",
@@ -101,6 +103,8 @@ const copyText = {
     deploying: "Deploying...",
     setupNotice: "Not sure what to choose? Keep the defaults: Daily, Speed, and Compatibility. Advanced plans can be enabled later.",
     loginIntro: "Enter admin password to open the panel.",
+    securePanel: "Secure panel",
+    securePanelText: "Session isolation, hashed password, local config storage",
     loginButton: "Open panel",
     nodes: "nodes",
     copySub: "Copy subscription",
@@ -316,10 +320,16 @@ function protocolOption(id, p) {
 }
 
 function renderLogin() {
-  app.innerHTML = `<main class="shell"><section class="panel">
-    <div class="top miniTop"><div class="brand"><div class="mark"><span></span></div><div><h1>EasyNode</h1><p>${t("loginIntro")}</p></div></div><div class="actions">${langButton()}</div></div>
-    <div class="field"><label>${t("adminPassword")}</label><input id="password" type="password"></div>
-    <button class="btn primary" id="loginBtn">${t("loginButton")}</button><div id="err" class="error"></div>
+  app.innerHTML = `<main class="shell loginShell"><section class="loginPanel">
+    <div class="loginHero">
+      <div class="brand"><div class="mark large"><span></span></div><div><h1>EasyNode</h1><p>${t("securePanelText")}</p></div></div>
+      <div class="loginPulse"><i></i><i></i><i></i></div>
+    </div>
+    <div class="loginForm">
+      <div class="dialogHead"><div><h2>${t("securePanel")}</h2><p>${t("loginIntro")}</p></div>${langButton()}</div>
+      <div class="field"><label>${t("adminPassword")}</label><input id="password" type="password" autofocus></div>
+      <button class="btn primary big" id="loginBtn">${t("loginButton")}</button><div id="err" class="error"></div>
+    </div>
   </section></main>`;
   $("#langBtn").onclick = switchLang;
   $("#loginBtn").onclick = async () => {
