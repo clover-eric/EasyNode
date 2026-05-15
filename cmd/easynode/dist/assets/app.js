@@ -30,6 +30,7 @@ const copyText = {
     deploying: "部署中...",
     setupNotice: "不知道怎么选就保留默认：日常首选 + 高速传输 + 兼容优先。高级方案可以以后再开。",
     loginIntro: "输入管理员密码进入面板。",
+    loggingIn: "正在进入...",
     invalidPassword: "密码错误，请重新输入",
     tooManyLoginAttempts: "密码错误次数过多，请稍后再试",
     securePanel: "安全面板",
@@ -154,6 +155,7 @@ const copyText = {
     deploying: "Deploying...",
     setupNotice: "Not sure what to choose? Keep the defaults: Daily, Speed, and Compatibility. Advanced plans can be enabled later.",
     loginIntro: "Enter admin password to open the panel.",
+    loggingIn: "Opening...",
     invalidPassword: "Invalid password. Please try again.",
     tooManyLoginAttempts: "Too many login attempts. Try again later.",
     securePanel: "Secure panel",
@@ -463,13 +465,23 @@ function renderLogin() {
   $("#loginBtn").onclick = async () => {
     $("#err").hidden = true;
     $("#err").textContent = "";
+    $("#loginBtn").disabled = true;
+    $("#loginBtn").classList.add("loading");
+    $("#loginBtn").textContent = t("loggingIn");
+    $("#password").disabled = true;
     try {
       await api("/api/v1/login", { method: "POST", body: JSON.stringify({ password: $("#password").value }) });
       state = await api("/api/v1/state");
-      renderDashboard();
+      $(".loginPanel").classList.add("leaving");
+      setTimeout(renderDashboard, 180);
     } catch (e) {
       $("#err").textContent = e.message;
       $("#err").hidden = false;
+      $("#loginBtn").disabled = false;
+      $("#loginBtn").classList.remove("loading");
+      $("#loginBtn").textContent = t("loginButton");
+      $("#password").disabled = false;
+      $("#password").focus();
     }
   };
 }
