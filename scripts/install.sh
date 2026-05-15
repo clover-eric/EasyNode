@@ -174,6 +174,7 @@ open_firewall() {
 install_binary() {
   install -d -m 755 "$APP_DIR"
   install -d -m 700 "$DATA_DIR"
+  install -d -m 755 /etc/letsencrypt /var/lib/letsencrypt /var/log/letsencrypt
 
   if [ -z "$DOWNLOAD_URL" ] && [ -n "$GITHUB_REPO" ]; then
     DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/latest/download/easynode-linux-${EASYNODE_ARCH}"
@@ -284,7 +285,7 @@ User=root
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
-ReadWritePaths=$DATA_DIR
+ReadWritePaths=$DATA_DIR /etc/letsencrypt /var/lib/letsencrypt /var/log/letsencrypt
 LimitNOFILE=1048576
 
 [Install]
