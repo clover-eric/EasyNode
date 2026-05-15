@@ -59,6 +59,7 @@ const copyText = {
     logout: "退出",
     chainProxy: "链式代理",
     chainText: "落地服务器生成配对码，入口服务器填入后建立出口配置。",
+    chainNotice: "1. 在落地服务器生成配对令牌。2. 到入口服务器粘贴令牌并完成配对。",
     endpointPlaceholder: "本机面板地址或公网地址",
     generateCode: "生成配对码",
     addExit: "添加落地",
@@ -95,6 +96,7 @@ const copyText = {
     purityHint: "基于公开 IP 信誉信号的基础判断，仅作参考。",
     ipType: "IP 类型",
     nativeCheck: "原生倾向",
+    locationSources: "定位来源",
     useCases: "适用场景",
     risks: "风险提示",
     copyLink: "复制链接",
@@ -186,6 +188,7 @@ const copyText = {
     logout: "Log out",
     chainProxy: "Chain proxy",
     chainText: "Generate a pairing code on the exit server, then enter it on the entry server.",
+    chainNotice: "1. Generate a pairing token on the exit server. 2. Paste it on the entry server to pair.",
     endpointPlaceholder: "Panel URL or public endpoint",
     generateCode: "Generate code",
     addExit: "Add exit",
@@ -222,11 +225,12 @@ const copyText = {
     purityHint: "Basic public IP reputation heuristic. For reference only.",
     ipType: "IP type",
     nativeCheck: "Native tendency",
+    locationSources: "Location sources",
     useCases: "Use cases",
     risks: "Risk flags",
     copyLink: "Copy link",
     showQR: "QR code",
-    importShadowrocket: "Import to Shadowrocket",
+    importShadowrocket: "Shadowrocket",
     scanToImport: "Scan to import",
     stop: "Stop",
     start: "Start",
@@ -561,7 +565,7 @@ function renderDashboard() {
     </header>
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
     <section class="split chainGrid" style="margin-top:16px">
-      <div class="card chainCard"><div class="cardHead"><div class="proto">${t("chainProxy")}</div><span class="badge chainAccept">${state.chain_pairing_disabled ? t("pairingClosed") : t("acceptingPairing")}</span></div><p>${t("chainText")}</p><div class="row chainRow" style="margin-top:14px"><input id="genEndpoint" placeholder="${t("endpointPlaceholder")}" value="${location.origin}"><button class="btn primary" id="genCode" ${state.chain_pairing_disabled ? "disabled" : ""}>${t("generateCode")}</button><button class="btn" id="togglePairing">${state.chain_pairing_disabled ? t("openPairing") : t("closePairing")}</button></div><div id="codeBox" class="notice chainNotice">1. 在落地服务器生成配对令牌。2. 到入口服务器粘贴令牌并完成配对。</div>${chainClientsSectionHTML()}</div>
+      <div class="card chainCard"><div class="cardHead"><div class="proto">${t("chainProxy")}</div><span class="badge chainAccept">${state.chain_pairing_disabled ? t("pairingClosed") : t("acceptingPairing")}</span></div><p>${t("chainText")}</p><div class="row chainRow" style="margin-top:14px"><input id="genEndpoint" placeholder="${t("endpointPlaceholder")}" value="${location.origin}"><button class="btn primary" id="genCode" ${state.chain_pairing_disabled ? "disabled" : ""}>${t("generateCode")}</button><button class="btn" id="togglePairing">${state.chain_pairing_disabled ? t("openPairing") : t("closePairing")}</button></div><div id="codeBox" class="notice chainNotice">${t("chainNotice")}</div>${chainClientsSectionHTML()}</div>
       <div class="card chainCard"><div class="proto">${t("addExit")}</div><p>${t("addExitText")}</p><div class="field"><label>${t("pairingCode")}</label><textarea class="copyBox chainTokenInput" id="pairCode" placeholder="ENPAIR-..."></textarea></div><div class="field"><label>${t("myEndpoint")}</label><input id="pairEndpoint" placeholder="${location.origin}" value="${location.origin}"></div><button class="btn primary" id="pairBtn">${t("pairDoneButton")}</button><div class="chainPeers">${chainPeersHTML()}</div></div>
     </section>
   </main>`;
@@ -969,7 +973,7 @@ async function showPurity() {
       <div class="purityMain"><div class="purityScore">${r.score}<span>/100</span></div><p>${pt(r.level || "")} · ${r.ip || ""}</p><p><span class="flag">${flagEmoji(r.country_code)}</span>${countryName(r.country)} ${r.asn || ""}</p><p>${r.isp || ""}</p></div>
       <div class="purityMeta"><b>${t("ipType")}</b><span>${pt(r.ip_type || "-")}</span></div>
       <div class="purityMeta"><b>${t("nativeCheck")}</b><span>${pt(r.native || "-")}</span></div>
-      <div class="purityMeta wide"><b>定位来源</b><span>${pt(r.location_confidence || "")}${locationSourcesHTML(r.location_sources || [])}</span></div>
+      <div class="purityMeta wide"><b>${t("locationSources")}</b><span>${pt(r.location_confidence || "")}${locationSourcesHTML(r.location_sources || [])}</span></div>
       <div class="purityMeta wide"><b>${t("risks")}</b><span>${(r.risks || []).map(pt).join("<br>") || pt("No obvious risk flag")}</span></div>
       <div class="purityMeta wide"><b>${t("useCases")}</b>${(r.use_cases || []).map(x => `<span>${pt(x.name)}: ${pt(x.status)} - ${pt(x.reason)}</span>`).join("")}</div>
     </div>`;

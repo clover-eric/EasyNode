@@ -71,3 +71,6 @@ body{min-height:100%;background-color:#062f2c;background-image:radial-gradient(c
   .shell{padding-top:calc(env(safe-area-inset-top,0px) + 82px)!important}
   .bootShell{padding-top:calc(env(safe-area-inset-top,0px) + 82px)!important}
 }
+.card .row .btn{display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
+.card .row .btn[data-node-shadowrocket]{font-size:14px}
+.chainNotice{line-height:1.45}
