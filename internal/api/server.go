@@ -316,13 +316,22 @@ func (s *Server) ChainPublicUnpaired(w http.ResponseWriter, r *http.Request) {
 	err := s.store.Update(func(st *model.AppState) error {
 		next := st.ChainPeers[:0]
 		for _, peer := range st.ChainPeers {
-			if chainPeerMatches(peer, "", req.PublicKey, req.OutboundLink) {
+			if chainPeerMatches(peer, req.ExitEndpoint, req.PublicKey, req.OutboundLink) {
 				removed = true
 				continue
 			}
 			next = append(next, peer)
 		}
 		st.ChainPeers = next
+		nextClients := st.ChainClients[:0]
+		for _, client := range st.ChainClients {
+			if chainClientMatches(client, req.Endpoint, req.PublicKey, req.OutboundLink) {
+				removed = true
+				continue
+			}
+			nextClients = append(nextClients, client)
+		}
+		st.ChainClients = nextClients
 		return nil
 	})
 	if err != nil {
@@ -1011,11 +1020,13 @@ func (s *Server) RemoveChainPeer(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
+	var removedPeer model.ChainPeer
 	err := s.store.Update(func(st *model.AppState) error {
 		next := st.ChainPeers[:0]
 		removed := false
 		for _, peer := range st.ChainPeers {
 			if peer.ID == req.ID {
+				removedPeer = peer
 				removed = true
 				continue
 			}
@@ -1034,7 +1045,14 @@ func (s *Server) RemoveChainPeer(w http.ResponseWriter, r *http.Request) {
 	st := s.store.Snapshot()
 	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 	_ = singbox.RestartService()
-	writeJSON(w, http.StatusOK, publicState(st))
+	notified, notifyErr := notifyRemoteUnpaired(removedPeer.Endpoint, chainSelfEndpoint(st), removedPeer.Endpoint, "", removedPeer.OutboundLink)
+	resp := publicState(st)
+	out := withPanelURL(resp)
+	out["exit_notified"] = notified
+	if notifyErr != "" {
+		out["exit_notify_error"] = notifyErr
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) RemoveChainClient(w http.ResponseWriter, r *http.Request) {
@@ -1124,6 +1142,12 @@ func chainPeerMatches(peer model.ChainPeer, endpoint, publicKey, outboundLink st
 		(outboundLink != "" && peer.OutboundLink == outboundLink)
 }
 
+func chainClientMatches(client model.ChainClient, endpoint, publicKey, outboundLink string) bool {
+	return (endpoint != "" && client.Endpoint == endpoint) ||
+		(publicKey != "" && client.PublicKey == publicKey) ||
+		(outboundLink != "" && client.OutboundLink == outboundLink)
+}
+
 func upsertChainClient(st *model.AppState, client model.ChainClient) {
 	for i := range st.ChainClients {
 		if st.ChainClients[i].Endpoint == client.Endpoint || (client.PublicKey != "" && st.ChainClients[i].PublicKey == client.PublicKey) {
@@ -1164,13 +1188,17 @@ func notifyExitPaired(bundle chain.Bundle, endpoint, publicKey string) (bool, st
 }
 
 func notifyEntryUnpaired(client model.ChainClient, exitEndpoint string) (bool, string) {
-	u, err := url.Parse(client.Endpoint)
+	return notifyRemoteUnpaired(client.Endpoint, exitEndpoint, client.Endpoint, client.PublicKey, client.OutboundLink)
+}
+
+func notifyRemoteUnpaired(remoteEndpoint, exitEndpoint, entryEndpoint, publicKey, outboundLink string) (bool, string) {
+	u, err := url.Parse(remoteEndpoint)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return false, "invalid entry endpoint"
+		return false, "invalid remote endpoint"
 	}
 	u.Path = "/api/v1/chain/public/unpaired"
 	u.RawQuery = ""
-	body, _ := json.Marshal(map[string]string{"exit_endpoint": exitEndpoint, "endpoint": client.Endpoint, "public_key": client.PublicKey, "outbound_link": client.OutboundLink})
+	body, _ := json.Marshal(map[string]string{"exit_endpoint": exitEndpoint, "endpoint": entryEndpoint, "public_key": publicKey, "outbound_link": outboundLink})
 	httpClient := http.Client{Timeout: 3 * time.Second}
 	resp, err := httpClient.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
