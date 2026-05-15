@@ -325,7 +325,7 @@ func (s *Server) ChainPublicUnpaired(w http.ResponseWriter, r *http.Request) {
 		st.ChainPeers = next
 		nextClients := st.ChainClients[:0]
 		for _, client := range st.ChainClients {
-			if chainClientMatches(client, req.Endpoint, req.PublicKey, req.OutboundLink) {
+			if chainClientMatches(client, req.Endpoint, req.PublicKey) {
 				removed = true
 				continue
 			}
@@ -1055,7 +1055,8 @@ func (s *Server) RemoveChainPeer(w http.ResponseWriter, r *http.Request) {
 	st := s.store.Snapshot()
 	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 	_ = singbox.RestartService()
-	notified, notifyErr := notifyRemoteUnpaired(removedPeer.Endpoint, chainSelfEndpoint(st), removedPeer.Endpoint, "", removedPeer.OutboundLink)
+	selfEndpoint := chainSelfEndpoint(st)
+	notified, notifyErr := notifyRemoteUnpaired(removedPeer.Endpoint, removedPeer.Endpoint, selfEndpoint, "", "")
 	resp := publicState(st)
 	out := withPanelURL(resp)
 	out["exit_notified"] = notified
@@ -1152,10 +1153,9 @@ func chainPeerMatches(peer model.ChainPeer, endpoint, publicKey, outboundLink st
 		(outboundLink != "" && peer.OutboundLink == outboundLink)
 }
 
-func chainClientMatches(client model.ChainClient, endpoint, publicKey, outboundLink string) bool {
+func chainClientMatches(client model.ChainClient, endpoint, publicKey string) bool {
 	return (endpoint != "" && client.Endpoint == endpoint) ||
-		(publicKey != "" && client.PublicKey == publicKey) ||
-		(outboundLink != "" && client.OutboundLink == outboundLink)
+		(publicKey != "" && client.PublicKey == publicKey)
 }
 
 func upsertChainClient(st *model.AppState, client model.ChainClient) {
