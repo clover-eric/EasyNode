@@ -32,6 +32,7 @@ type Server struct {
 
 func New(st *store.Store, dataDir string, static embed.FS) *Server {
 	s := &Server{store: st, dataDir: dataDir, static: static, mux: http.NewServeMux()}
+	_ = s.ensureRunnableNodes()
 	s.routes()
 	return s
 }
@@ -114,6 +115,7 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 	st := s.store.Snapshot()
 	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers)
+	_ = singbox.RestartService()
 	setSession(w, st.SessionToken)
 	writeJSON(w, http.StatusOK, publicState(st))
 }
@@ -242,6 +244,7 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	next := s.store.Snapshot()
 	_, _ = singbox.WriteConfig(s.dataDir, next.Nodes, next.ChainPeers)
+	_ = singbox.RestartService()
 	if newHash != "" {
 		setSession(w, next.SessionToken)
 	}
@@ -278,6 +281,7 @@ func (s *Server) NodeAction(w http.ResponseWriter, r *http.Request) {
 	}
 	st := s.store.Snapshot()
 	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers)
+	_ = singbox.RestartService()
 	writeJSON(w, http.StatusOK, st.Nodes)
 }
 
@@ -432,12 +436,63 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 			Label: rec.Label, Description: rec.Description, Priority: rec.Priority, Status: "running",
 			Port: ports[rec.Protocol], UUID: util.UUID(), Password: util.Token(12), Host: host, CreatedAt: time.Now(),
 		}
+		if n.Protocol == "vless-reality" {
+			m := singbox.GenerateRealityMaterial()
+			n.RealityPrivateKey = m.PrivateKey
+			n.RealityPublicKey = m.PublicKey
+			n.RealityShortID = m.ShortID
+		} else {
+			n.Status = "stopped"
+		}
 		lat := 18 + len(nodes)*11
 		n.LatencyMS = &lat
-		n.SubscribeLink = subscribe.Link(n)
+		if n.Status == "running" {
+			n.SubscribeLink = subscribe.Link(n)
+		}
 		nodes = append(nodes, n)
 	}
 	return nodes
+}
+
+func (s *Server) ensureRunnableNodes() error {
+	changed := false
+	err := s.store.Update(func(st *model.AppState) error {
+		host := st.Domain
+		if st.IPDirect || host == "" {
+			host = "127.0.0.1"
+		}
+		for i := range st.Nodes {
+			n := &st.Nodes[i]
+			n.Host = host
+			if n.Protocol == "vless-reality" {
+				if n.RealityPrivateKey == "" || n.RealityPublicKey == "" || n.RealityShortID == "" {
+					m := singbox.GenerateRealityMaterial()
+					n.RealityPrivateKey = m.PrivateKey
+					n.RealityPublicKey = m.PublicKey
+					n.RealityShortID = m.ShortID
+					changed = true
+				}
+				n.Status = "running"
+				n.SubscribeLink = subscribe.Link(*n)
+				continue
+			}
+			if n.Status == "running" {
+				n.Status = "stopped"
+				changed = true
+			}
+			n.SubscribeLink = ""
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if changed {
+		st := s.store.Snapshot()
+		_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers)
+		_ = singbox.RestartService()
+	}
+	return nil
 }
 
 func setSession(w http.ResponseWriter, token string) {

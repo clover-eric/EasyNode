@@ -124,15 +124,15 @@ const copyText = {
 const profiles = {
   zh: {
     "vless-reality": ["日常首选", "VLESS Reality", "5/5", "v2rayN, Nekoray, Shadowrocket, sing-box", "网页、视频、聊天、长期稳定使用", "不需要域名证书，伪装能力强，默认建议开启。", "部分旧客户端不支持 Reality。", true],
-    "hysteria2": ["高速传输", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "移动网络、跨境视频、下载、UDP 通畅线路", "基于 QUIC，弱网和高延迟线路上通常更快。", "服务器或运营商封 UDP 时效果会下降。", true],
-    "trojan-tls": ["兼容优先", "Trojan TLS", "4/5", "几乎所有主流代理客户端", "给家人朋友用、旧客户端、追求少折腾", "形态接近普通 HTTPS，客户端兼容性最好。", "需要域名和 TLS 证书。", true],
+    "hysteria2": ["高速传输", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "移动网络、跨境视频、下载、UDP 通畅线路", "基于 QUIC，弱网和高延迟线路上通常更快。", "需要证书接入，当前作为后续开启方案。", false],
+    "trojan-tls": ["兼容优先", "Trojan TLS", "4/5", "几乎所有主流代理客户端", "给家人朋友用、旧客户端、追求少折腾", "形态接近普通 HTTPS，客户端兼容性最好。", "需要域名和 TLS 证书，当前作为后续开启方案。", false],
     "vless-ws-tls": ["CDN 线路", "VLESS WS TLS", "3/5", "v2rayN, Clash Meta, Shadowrocket", "套 Cloudflare/CDN、隐藏真实服务器 IP", "走 WebSocket + TLS，适合反代和 CDN 中转。", "速度通常不是最强，配置链路更长。", false],
     "tuic": ["备用加速", "TUIC v5", "3/5", "Nekoray, sing-box, 部分移动客户端", "UDP 可用时作为第二条 QUIC 备用线路", "现代 QUIC 协议，适合做补充节点。", "客户端覆盖率低于 Trojan 和 VLESS。", false]
   },
   en: {
     "vless-reality": ["Daily default", "VLESS Reality", "5/5", "v2rayN, Nekoray, Shadowrocket, sing-box", "Browsing, video, chat, long-term stable use", "No domain certificate required. Strong camouflage and best default choice.", "Some older clients do not support Reality.", true],
-    "hysteria2": ["Speed mode", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "Mobile networks, streaming, downloads, UDP-friendly routes", "QUIC-based. Often faster on weak or high-latency networks.", "Performance drops if UDP is blocked.", true],
-    "trojan-tls": ["Compatibility", "Trojan TLS", "4/5", "Almost every mainstream proxy client", "Friends, family, older clients, minimal troubleshooting", "Looks close to normal HTTPS and has excellent client support.", "Requires a domain and TLS certificate.", true],
+    "hysteria2": ["Speed mode", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "Mobile networks, streaming, downloads, UDP-friendly routes", "QUIC-based. Often faster on weak or high-latency networks.", "Requires certificate support; kept as a later option for now.", false],
+    "trojan-tls": ["Compatibility", "Trojan TLS", "4/5", "Almost every mainstream proxy client", "Friends, family, older clients, minimal troubleshooting", "Looks close to normal HTTPS and has excellent client support.", "Requires a domain and TLS certificate; kept as a later option for now.", false],
     "vless-ws-tls": ["CDN route", "VLESS WS TLS", "3/5", "v2rayN, Clash Meta, Shadowrocket", "Cloudflare/CDN, reverse proxy, hiding origin IP", "WebSocket over TLS, useful behind CDN or reverse proxy.", "Usually not the fastest and has a longer config chain.", false],
     "tuic": ["Backup boost", "TUIC v5", "3/5", "Nekoray, sing-box, selected mobile clients", "A second QUIC route when UDP works well", "Modern QUIC protocol, useful as a backup node.", "Client coverage is lower than Trojan and VLESS.", false]
   }

@@ -20,23 +20,26 @@ type AppState struct {
 }
 
 type Node struct {
-	ID            string    `json:"id"`
-	Protocol      string    `json:"protocol"`
-	Transport     string    `json:"transport"`
-	Security      string    `json:"security"`
-	Label         string    `json:"label"`
-	Description   string    `json:"description"`
-	Priority      int       `json:"priority"`
-	Status        string    `json:"status"`
-	LatencyMS     *int      `json:"latency_ms"`
-	TrafficUsed   int64     `json:"traffic_used"`
-	TrafficTotal  *int64    `json:"traffic_total"`
-	Port          int       `json:"port"`
-	UUID          string    `json:"uuid"`
-	Password      string    `json:"password"`
-	Host          string    `json:"host"`
-	CreatedAt     time.Time `json:"created_at"`
-	SubscribeLink string    `json:"subscribe_link"`
+	ID                string    `json:"id"`
+	Protocol          string    `json:"protocol"`
+	Transport         string    `json:"transport"`
+	Security          string    `json:"security"`
+	Label             string    `json:"label"`
+	Description       string    `json:"description"`
+	Priority          int       `json:"priority"`
+	Status            string    `json:"status"`
+	LatencyMS         *int      `json:"latency_ms"`
+	TrafficUsed       int64     `json:"traffic_used"`
+	TrafficTotal      *int64    `json:"traffic_total"`
+	Port              int       `json:"port"`
+	UUID              string    `json:"uuid"`
+	Password          string    `json:"password"`
+	RealityPrivateKey string    `json:"reality_private_key,omitempty"`
+	RealityPublicKey  string    `json:"reality_public_key,omitempty"`
+	RealityShortID    string    `json:"reality_short_id,omitempty"`
+	Host              string    `json:"host"`
+	CreatedAt         time.Time `json:"created_at"`
+	SubscribeLink     string    `json:"subscribe_link"`
 }
 
 type Recommendation struct {

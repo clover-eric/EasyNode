@@ -3,10 +3,44 @@ package singbox
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"easynode/internal/model"
+	"easynode/internal/util"
 )
+
+type RealityMaterial struct {
+	PrivateKey string
+	PublicKey  string
+	ShortID    string
+}
+
+func GenerateRealityMaterial() RealityMaterial {
+	m := RealityMaterial{ShortID: util.Token(8)}
+	out, err := exec.Command("sing-box", "generate", "reality-keypair").CombinedOutput()
+	if err != nil {
+		return m
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(line), "privatekey:") || strings.HasPrefix(strings.ToLower(line), "private_key:") {
+			m.PrivateKey = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+		}
+		if strings.HasPrefix(strings.ToLower(line), "publickey:") || strings.HasPrefix(strings.ToLower(line), "public_key:") {
+			m.PublicKey = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+		}
+	}
+	return m
+}
+
+func RestartService() error {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		return nil
+	}
+	return exec.Command("systemctl", "restart", "easynode-singbox").Run()
+}
 
 func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer) (string, error) {
 	cfg := map[string]any{
@@ -22,6 +56,9 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer) (s
 	inbounds := make([]any, 0, len(nodes))
 	for _, n := range nodes {
 		if n.Status != "running" {
+			continue
+		}
+		if n.Protocol != "vless-reality" {
 			continue
 		}
 		inbounds = append(inbounds, inbound(n))
@@ -46,7 +83,16 @@ func inbound(n model.Node) map[string]any {
 	switch n.Protocol {
 	case "vless-reality":
 		base["users"] = []any{map[string]any{"uuid": n.UUID, "flow": "xtls-rprx-vision"}}
-		base["tls"] = map[string]any{"enabled": true, "server_name": "www.microsoft.com", "reality": map[string]any{"enabled": true, "handshake": map[string]any{"server": "www.microsoft.com", "server_port": 443}}}
+		base["tls"] = map[string]any{
+			"enabled":     true,
+			"server_name": "www.microsoft.com",
+			"reality": map[string]any{
+				"enabled":     true,
+				"private_key": n.RealityPrivateKey,
+				"short_id":    []string{n.RealityShortID},
+				"handshake":   map[string]any{"server": "www.microsoft.com", "server_port": 443},
+			},
+		}
 	case "trojan-tls":
 		base["users"] = []any{map[string]any{"password": n.Password}}
 		base["tls"] = map[string]any{"enabled": true}

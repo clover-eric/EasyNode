@@ -6,6 +6,7 @@ APP_DIR="/opt/easynode"
 DATA_DIR="/var/lib/easynode"
 BIN="/usr/local/bin/easynode"
 SERVICE="/etc/systemd/system/easynode.service"
+SING_BOX_SERVICE="/etc/systemd/system/easynode-singbox.service"
 PORT="8088"
 ASSUME_YES="0"
 DO_UPGRADE="ask"
@@ -221,6 +222,18 @@ install_go_if_missing() {
   fi
 }
 
+install_sing_box() {
+  if command -v sing-box >/dev/null 2>&1; then
+    return
+  fi
+  log "Installing sing-box core"
+  if command -v apt-get >/dev/null 2>&1; then
+    curl -fsSL https://sing-box.app/deb-install.sh | bash
+  else
+    die "Automatic sing-box install currently supports Debian/Ubuntu only"
+  fi
+}
+
 build_from_source() {
   install_go_if_missing
   command -v git >/dev/null 2>&1 || die "git is required for source build"
@@ -236,6 +249,24 @@ build_from_source() {
 }
 
 write_service() {
+  cat >"$SING_BOX_SERVICE" <<EOF
+[Unit]
+Description=EasyNode sing-box core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env sing-box run -c $DATA_DIR/sing-box.json
+Restart=always
+RestartSec=3
+User=root
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
   cat >"$SERVICE" <<EOF
 [Unit]
 Description=EasyNode intelligent proxy panel
@@ -258,6 +289,7 @@ LimitNOFILE=1048576
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
+  systemctl enable easynode-singbox
   systemctl enable "$APP_NAME"
   systemctl restart "$APP_NAME"
 }
@@ -306,6 +338,7 @@ if ask "Enable BBR network acceleration?" "yes" "$DO_BBR"; then
 fi
 
 install_binary
+install_sing_box
 write_service
 wait_for_panel
 

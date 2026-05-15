@@ -17,7 +17,7 @@ func Link(n model.Node) string {
 	name := url.QueryEscape("EasyNode " + n.Protocol)
 	switch n.Protocol {
 	case "vless-reality":
-		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.microsoft.com#%s", n.UUID, host, n.Port, name)
+		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.microsoft.com&fp=chrome&pbk=%s&sid=%s#%s", n.UUID, host, n.Port, url.QueryEscape(n.RealityPublicKey), url.QueryEscape(n.RealityShortID), name)
 	case "trojan-tls":
 		return fmt.Sprintf("trojan://%s@%s:%d?security=tls&type=tcp&sni=%s#%s", n.Password, host, n.Port, host, name)
 	case "hysteria2":
