@@ -553,7 +553,19 @@ async function checkUpdateNotice() {
 
 function updateNotesHTML(notes) {
   if (!notes.length) return "";
-  return `<ul class="updateNotes">${notes.map(n => `<li><span>${esc(n.commit || "")}</span>${esc(n.message || "")}</li>`).join("")}</ul>`;
+  return `<ul class="updateNotes">${notes.map(n => `<li><span>${esc(n.commit || "")}</span>${esc(localizeUpdateMessage(n.message || ""))}</li>`).join("")}</ul>`;
+}
+
+function localizeUpdateMessage(message) {
+  if (lang !== "zh") return message;
+  return message
+    .replace(/^feat:\s*/i, "新增：")
+    .replace(/^fix:\s*/i, "修复：")
+    .replace(/^style:\s*/i, "界面优化：")
+    .replace(/^docs:\s*/i, "文档：")
+    .replace(/^chore:\s*/i, "维护：")
+    .replace(/^refactor:\s*/i, "重构：")
+    .replace(/^test:\s*/i, "测试：");
 }
 
 function renderProtocolLibrary() {

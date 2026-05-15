@@ -253,9 +253,10 @@ func (s *Server) ChainPublicPaired(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Code      string `json:"code"`
-		Endpoint  string `json:"endpoint"`
-		PublicKey string `json:"public_key"`
+		Code         string `json:"code"`
+		Endpoint     string `json:"endpoint"`
+		PublicKey    string `json:"public_key"`
+		OutboundLink string `json:"outbound_link"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -271,6 +272,14 @@ func (s *Server) ChainPublicPaired(w http.ResponseWriter, r *http.Request) {
 				st.PairingCodes[i].Used = true
 				found = true
 				break
+			}
+		}
+		if !found && req.OutboundLink != "" {
+			for _, n := range st.Nodes {
+				if n.Status == "running" && subscribe.Link(n) == req.OutboundLink {
+					found = true
+					break
+				}
 			}
 		}
 		if !found {
@@ -1031,7 +1040,7 @@ func notifyExitPaired(bundle chain.Bundle, endpoint, publicKey string) (bool, st
 	}
 	u.Path = "/api/v1/chain/public/paired"
 	u.RawQuery = ""
-	body, _ := json.Marshal(map[string]string{"code": bundle.Code, "endpoint": endpoint, "public_key": publicKey})
+	body, _ := json.Marshal(map[string]string{"code": bundle.Code, "endpoint": endpoint, "public_key": publicKey, "outbound_link": bundle.OutboundLink})
 	client := http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {

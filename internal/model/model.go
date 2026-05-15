@@ -20,7 +20,7 @@ type AppState struct {
 	ChainPeers           []ChainPeer   `json:"chain_peers"`
 	ChainClients         []ChainClient `json:"chain_clients,omitempty"`
 	ChainPairingDisabled bool          `json:"chain_pairing_disabled,omitempty"`
-	PairingCodes         []PairingCode `json:"-"`
+	PairingCodes         []PairingCode `json:"pairing_codes,omitempty"`
 	UpdatedAt            time.Time     `json:"updated_at"`
 }
 
