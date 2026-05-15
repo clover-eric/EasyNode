@@ -60,8 +60,10 @@ const copyText = {
     mainstreamClients: "主流客户端",
     latency: "延迟",
     port: "端口",
-    traffic: "流量",
+    score: "推荐",
     copyLink: "复制链接",
+    showQR: "二维码",
+    scanToImport: "扫码导入",
     stop: "停止",
     start: "启动",
     copied: "已复制",
@@ -140,8 +142,10 @@ const copyText = {
     mainstreamClients: "mainstream clients",
     latency: "Latency",
     port: "Port",
-    traffic: "Traffic",
+    score: "Score",
     copyLink: "Copy link",
+    showQR: "QR code",
+    scanToImport: "Scan to import",
     stop: "Stop",
     start: "Start",
     copied: "Copied",
@@ -390,6 +394,10 @@ function renderDashboard() {
     const n = state.nodes.find(x => x.id === b.dataset.nodeCopy);
     copy(n?.subscribe_link || "", b);
   });
+  document.querySelectorAll("[data-node-qr]").forEach(b => b.onclick = () => {
+    const n = state.nodes.find(x => x.id === b.dataset.nodeQr);
+    showQR(n?.subscribe_link || "", n ? protocolName(n.protocol) : "");
+  });
   document.querySelectorAll("[data-toggle]").forEach(b => b.onclick = async () => {
     try {
       state.nodes = await api(`/api/v1/nodes/${b.dataset.toggle}/toggle`, { method: "POST" });
@@ -549,19 +557,35 @@ function stripAnsi(text) {
 }
 
 function nodeCard(n) {
-  const used = (n.traffic_used / 1024 / 1024).toFixed(1);
   const p = profile(n.protocol);
   const canCopy = n.status === "running" && n.subscribe_link;
   const copyButton = canCopy
     ? `<button class="btn" data-node-copy="${n.id}">${t("copyLink")}</button>`
     : `<button class="btn" disabled title="${t("certRequired")}">${t("unavailable")}</button>`;
+  const qrButton = canCopy ? `<button class="btn" data-node-qr="${n.id}">${t("showQR")}</button>` : "";
   return `<article class="card ${n.status}">
     <div class="cardHead"><div class="status"><i class="dot"></i>${n.status === "running" ? t("running") : t("stopped")}</div><span class="badge starBadge">${stars(p.score)}</span></div>
     <div class="proto">${p.title}</div><p class="desc">${p.summary}</p>
     <div class="miniInfo">${p.protocol} · ${p.clients || t("mainstreamClients")}</div>
-    <div class="stats"><div class="stat"><b>${n.latency_ms ?? "-"}ms</b><span>${t("latency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${used}M</b><span>${t("traffic")}</span></div></div>
-    <div class="row">${copyButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
+    <div class="stats"><div class="stat"><b>${n.latency_ms ?? "-"}ms</b><span>${t("latency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${p.score}</b><span>${t("score")}</span></div></div>
+    <div class="row">${copyButton}${qrButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
   </article>`;
+}
+
+function showQR(text, title) {
+  if (!text) {
+    toast(t("copyFailed"));
+    return;
+  }
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  const src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(text)}`;
+  modal.innerHTML = `<div class="dialog qrDialog">
+    <div class="dialogHead"><div><h2>${t("scanToImport")}</h2><p>${title}</p></div><button class="btn ghost" id="closeQR">${t("cancel")}</button></div>
+    <div class="qrBox"><img src="${src}" alt="QR code"><textarea class="copyBox" readonly>${text}</textarea></div>
+  </div>`;
+  document.body.appendChild(modal);
+  $("#closeQR").onclick = () => modal.remove();
 }
 
 async function copy(text, button) {
