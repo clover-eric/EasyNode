@@ -1,11 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -381,10 +384,15 @@ func (s *Server) Static(w http.ResponseWriter, r *http.Request) {
 	if _, err := sub.Open(path); err != nil {
 		path = "index.html"
 	}
-	r2 := new(http.Request)
-	*r2 = *r
-	r2.URL.Path = "/" + path
-	http.FileServer(http.FS(sub)).ServeHTTP(w, r2)
+	b, err := fs.ReadFile(sub, path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if typ := mime.TypeByExtension(filepath.Ext(path)); typ != "" {
+		w.Header().Set("Content-Type", typ)
+	}
+	http.ServeContent(w, r, path, time.Time{}, bytes.NewReader(b))
 }
 
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
