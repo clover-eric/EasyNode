@@ -320,7 +320,7 @@ func (s *Server) runUpgrade(backup string) {
 	}
 	s.setUpgrade(35, "downloading installer", "", "", backup, true)
 	_ = exec.Command("systemctl", "reset-failed", "easynode-upgrade").Run()
-	cmd := exec.Command("systemd-run", "--unit=easynode-upgrade", "bash", "-lc", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
+	cmd := exec.Command("systemd-run", "--unit=easynode-upgrade", "--setenv=HOME=/root", "--setenv=GOCACHE=/tmp/easynode-gocache", "--setenv=GOMODCACHE=/tmp/easynode-gomodcache", "bash", "-lc", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		s.setUpgrade(100, "upgrade failed", string(out), err.Error(), backup, false)

@@ -19,6 +19,9 @@ GITHUB_REPO="${EASYNODE_GITHUB_REPO:-}"
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 export NEEDRESTART_SUSPEND=1
+export HOME="${HOME:-/root}"
+export GOCACHE="${GOCACHE:-/tmp/easynode-gocache}"
+export GOMODCACHE="${GOMODCACHE:-/tmp/easynode-gomodcache}"
 
 usage() {
   cat <<EOF
@@ -182,6 +185,7 @@ install_binary() {
   install -d -m 755 "$APP_DIR"
   install -d -m 700 "$DATA_DIR"
   install -d -m 755 /etc/letsencrypt /var/lib/letsencrypt /var/log/letsencrypt
+  install -d -m 700 "$GOCACHE" "$GOMODCACHE"
 
   if [ -z "$DOWNLOAD_URL" ] && [ -n "$GITHUB_REPO" ]; then
     DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/latest/download/easynode-linux-${EASYNODE_ARCH}"
