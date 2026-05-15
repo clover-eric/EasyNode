@@ -261,6 +261,19 @@ EOF
   systemctl enable --now "$APP_NAME"
 }
 
+wait_for_panel() {
+  for _ in $(seq 1 20); do
+    if curl -fsS --max-time 2 "http://127.0.0.1:${PORT}/api/v1/setup/status" >/tmp/easynode-setup-status.json 2>/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  warn "EasyNode service did not become ready"
+  systemctl status easynode --no-pager -l || true
+  journalctl -u easynode -n 80 --no-pager || true
+  return 1
+}
+
 public_ip() {
   curl -fsS --max-time 3 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "SERVER_IP"
 }
@@ -293,24 +306,20 @@ fi
 
 install_binary
 write_service
+wait_for_panel
 
 if ask "Open firewall port ${PORT}/tcp if firewall is active?" "yes" "$DO_FIREWALL"; then
   open_firewall
 fi
 
 IP="$(public_ip)"
-PANEL_PATH="$(curl -fsS --max-time 3 "http://127.0.0.1:${PORT}/api/v1/setup/status" 2>/dev/null | sed -n 's/.*"panel_path":"\([^"]*\)".*/\1/p')"
-PANEL_PATH="${PANEL_PATH:-/}"
 
 cat <<EOF
 
 EasyNode installed.
 
-Open:
-  http://${IP}:${PORT}${PANEL_PATH}
-
-Local:
-  http://127.0.0.1:${PORT}${PANEL_PATH}
+Open this in your browser:
+  http://${IP}:${PORT}
 
 Useful commands:
   systemctl status easynode
@@ -322,4 +331,6 @@ Next:
   2. Set admin password.
   3. Enter domain or choose IP direct mode.
   4. Keep recommended node plans unless you know what to change.
+
+If the browser cannot open it, check your cloud firewall/security group allows TCP ${PORT}.
 EOF

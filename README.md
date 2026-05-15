@@ -43,7 +43,8 @@ curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/i
 - 安装 systemd 服务
 - 设置开机自启
 - 在启用 `ufw` 或 `firewalld` 时开放面板端口
-- 输出面板访问地址
+- 启动后自检服务是否可用
+- 只输出一个浏览器访问地址
 
 常用参数：
 
