@@ -84,6 +84,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/subscribe/", s.Subscribe)
 	s.mux.HandleFunc("/api/v1/chain/generate-code", s.auth(s.GenerateCode))
 	s.mux.HandleFunc("/api/v1/chain/pair", s.auth(s.Pair))
+	s.mux.HandleFunc("/api/v1/chain/remove", s.auth(s.RemoveChainPeer))
+	s.mux.HandleFunc("/api/v1/chain/accepting", s.auth(s.SetChainAccepting))
 	s.mux.HandleFunc("/api/v1/sing-box/config", s.auth(s.SingBoxConfig))
 	s.mux.HandleFunc("/", s.Static)
 }
@@ -695,6 +697,10 @@ func (s *Server) GenerateCode(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	st := s.store.Snapshot()
+	if st.ChainPairingDisabled {
+		writeError(w, http.StatusForbidden, errors.New("chain pairing is disabled on this server"))
+		return
+	}
 	outboundLink := firstRunningLink(st.Nodes)
 	if outboundLink == "" {
 		writeError(w, http.StatusBadRequest, errors.New("no running node available for chain exit"))
@@ -764,6 +770,64 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"peer_public_key": paired.PublicKey, "peer_endpoint": paired.Endpoint, "tunnel_config": paired})
+}
+
+func (s *Server) RemoveChainPeer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	err := s.store.Update(func(st *model.AppState) error {
+		next := st.ChainPeers[:0]
+		removed := false
+		for _, peer := range st.ChainPeers {
+			if peer.ID == req.ID {
+				removed = true
+				continue
+			}
+			next = append(next, peer)
+		}
+		if !removed {
+			return errors.New("chain peer not found")
+		}
+		st.ChainPeers = next
+		return nil
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	st := s.store.Snapshot()
+	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
+	_ = singbox.RestartService()
+	writeJSON(w, http.StatusOK, publicState(st))
+}
+
+func (s *Server) SetChainAccepting(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		method(w)
+		return
+	}
+	var req struct {
+		Accepting bool `json:"accepting"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	err := s.store.Update(func(st *model.AppState) error {
+		st.ChainPairingDisabled = !req.Accepting
+		if st.ChainPairingDisabled {
+			st.PairingCodes = nil
+		}
+		return nil
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, publicState(s.store.Snapshot()))
 }
 
 func upsertChainPeer(st *model.AppState, peer model.ChainPeer) {

@@ -56,6 +56,13 @@ const copyText = {
     myEndpoint: "我的入口地址",
     pairDoneButton: "完成配对",
     noPeers: "暂无配对",
+    acceptingPairing: "允许被配对",
+    pairingClosed: "已关闭被配对",
+    closePairing: "关闭配对",
+    openPairing: "允许配对",
+    unpair: "解除配对",
+    chainActive: "链式出口已启用",
+    chainRemoved: "已解除配对",
     expired: "过期",
     paired: "配对完成",
     running: "运行中",
@@ -150,6 +157,13 @@ const copyText = {
     myEndpoint: "My entry endpoint",
     pairDoneButton: "Pair",
     noPeers: "No peers yet",
+    acceptingPairing: "Accepting pairing",
+    pairingClosed: "Pairing disabled",
+    closePairing: "Disable pairing",
+    openPairing: "Enable pairing",
+    unpair: "Unpair",
+    chainActive: "Chain exit enabled",
+    chainRemoved: "Unpaired",
     expired: "expires",
     paired: "Paired",
     running: "Running",
@@ -388,7 +402,7 @@ function chainPeersHTML() {
     const endpoint = p.endpoint || "-";
     const host = shortHost(endpoint);
     const name = shortPeerName(p.name, endpoint);
-    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)}</span></div><em>${p.status === "paired" ? t("paired") : esc(p.status || "-")}</em></div>`;
+    return `<div class="chainPeer"><div><b>${esc(name)}</b><span>${esc(host)}</span></div><span class="chainPeerActions"><em>${p.status === "paired" ? t("paired") : esc(p.status || "-")}</em><button class="btn ghost" data-unpair="${esc(p.id)}">${t("unpair")}</button></span></div>`;
   }).join("");
 }
 
@@ -427,7 +441,7 @@ function renderDashboard() {
     </header>
     <section class="grid">${state.nodes.map(nodeCard).join("")}</section>
     <section class="split chainGrid" style="margin-top:16px">
-      <div class="card chainCard"><div class="proto">${t("chainProxy")}</div><p>${t("chainText")}</p><div class="row chainRow" style="margin-top:14px"><input id="genEndpoint" placeholder="${t("endpointPlaceholder")}" value="${location.origin}"><button class="btn primary" id="genCode">${t("generateCode")}</button></div><div id="codeBox" class="notice chainNotice">1. 在落地服务器生成配对令牌。2. 到入口服务器粘贴令牌并完成配对。</div></div>
+      <div class="card chainCard"><div class="cardHead"><div class="proto">${t("chainProxy")}</div><span class="badge chainAccept">${state.chain_pairing_disabled ? t("pairingClosed") : t("acceptingPairing")}</span></div><p>${t("chainText")}</p><div class="row chainRow" style="margin-top:14px"><input id="genEndpoint" placeholder="${t("endpointPlaceholder")}" value="${location.origin}"><button class="btn primary" id="genCode" ${state.chain_pairing_disabled ? "disabled" : ""}>${t("generateCode")}</button><button class="btn" id="togglePairing">${state.chain_pairing_disabled ? t("openPairing") : t("closePairing")}</button></div><div id="codeBox" class="notice chainNotice">1. 在落地服务器生成配对令牌。2. 到入口服务器粘贴令牌并完成配对。</div></div>
       <div class="card chainCard"><div class="proto">${t("addExit")}</div><p>${t("addExitText")}</p><div class="field"><label>${t("pairingCode")}</label><textarea class="copyBox chainTokenInput" id="pairCode" placeholder="ENPAIR-..."></textarea></div><div class="field"><label>${t("myEndpoint")}</label><input id="pairEndpoint" placeholder="${location.origin}" value="${location.origin}"></div><button class="btn primary" id="pairBtn">${t("pairDoneButton")}</button><div class="chainPeers">${chainPeersHTML()}</div></div>
     </section>
   </main>`;
@@ -439,6 +453,10 @@ function renderDashboard() {
   $("#subQR").onclick = () => showQR(sub, t("subQR"), "/api/v1/qrcode/subscribe");
   $("#downloadCfg").onclick = () => location.href = "/api/v1/sing-box/config";
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
+  $("#togglePairing").onclick = async () => {
+    state = await api("/api/v1/chain/accepting", { method: "POST", body: JSON.stringify({ accepting: !!state.chain_pairing_disabled }) });
+    renderDashboard();
+  };
   $("#genCode").onclick = async () => {
     const code = await api("/api/v1/chain/generate-code", { method: "POST", body: JSON.stringify({ endpoint: $("#genEndpoint").value || location.origin }) });
     const token = code.bundle || code.code;
@@ -449,12 +467,21 @@ function renderDashboard() {
     try {
       await api("/api/v1/chain/pair", { method: "POST", body: JSON.stringify({ code: $("#pairCode").value.trim(), my_endpoint: $("#pairEndpoint").value || location.origin, my_public_key: crypto.randomUUID(), display_name: "" }) });
       state = await api("/api/v1/state");
-      toast(t("paired"));
+      toast(t("chainActive"));
       renderDashboard();
     } catch (e) {
       toast(e.message);
     }
   };
+  document.querySelectorAll("[data-unpair]").forEach(b => b.onclick = async () => {
+    try {
+      state = await api("/api/v1/chain/remove", { method: "POST", body: JSON.stringify({ id: b.dataset.unpair }) });
+      toast(t("chainRemoved"));
+      renderDashboard();
+    } catch (e) {
+      toast(e.message);
+    }
+  });
   document.querySelectorAll("[data-node-copy]").forEach(b => b.onclick = () => {
     const n = state.nodes.find(x => x.id === b.dataset.nodeCopy);
     copy(n?.subscribe_link || "", b);

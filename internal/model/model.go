@@ -3,23 +3,24 @@ package model
 import "time"
 
 type AppState struct {
-	SetupDone         bool          `json:"setup_done"`
-	PanelPath         string        `json:"panel_path"`
-	AdminPassword     string        `json:"-"`
-	AdminPasswordHash string        `json:"admin_password_hash,omitempty"`
-	SessionToken      string        `json:"session_token,omitempty"`
-	LoginFailures     int           `json:"login_failures,omitempty"`
-	LockoutUntil      time.Time     `json:"lockout_until,omitempty"`
-	Domain            string        `json:"domain"`
-	IPDirect          bool          `json:"ip_direct"`
-	CertReady         bool          `json:"cert_ready"`
-	CertPath          string        `json:"cert_path,omitempty"`
-	KeyPath           string        `json:"key_path,omitempty"`
-	SubscribeKey      string        `json:"subscribe_key"`
-	Nodes             []Node        `json:"nodes"`
-	ChainPeers        []ChainPeer   `json:"chain_peers"`
-	PairingCodes      []PairingCode `json:"-"`
-	UpdatedAt         time.Time     `json:"updated_at"`
+	SetupDone            bool          `json:"setup_done"`
+	PanelPath            string        `json:"panel_path"`
+	AdminPassword        string        `json:"-"`
+	AdminPasswordHash    string        `json:"admin_password_hash,omitempty"`
+	SessionToken         string        `json:"session_token,omitempty"`
+	LoginFailures        int           `json:"login_failures,omitempty"`
+	LockoutUntil         time.Time     `json:"lockout_until,omitempty"`
+	Domain               string        `json:"domain"`
+	IPDirect             bool          `json:"ip_direct"`
+	CertReady            bool          `json:"cert_ready"`
+	CertPath             string        `json:"cert_path,omitempty"`
+	KeyPath              string        `json:"key_path,omitempty"`
+	SubscribeKey         string        `json:"subscribe_key"`
+	Nodes                []Node        `json:"nodes"`
+	ChainPeers           []ChainPeer   `json:"chain_peers"`
+	ChainPairingDisabled bool          `json:"chain_pairing_disabled,omitempty"`
+	PairingCodes         []PairingCode `json:"-"`
+	UpdatedAt            time.Time     `json:"updated_at"`
 }
 
 type Node struct {
