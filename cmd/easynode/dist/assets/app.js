@@ -67,6 +67,9 @@ const copyText = {
     onlineUpgrade: "在线升级",
     upgradeTip: "升级会先备份配置，过程中面板可能短暂断开。建议在业务低峰操作。",
     upgradeStarted: "升级已执行，请稍后刷新页面",
+    upgrading: "正在升级",
+    upgradeDone: "升级完成，请刷新页面",
+    upgradeFailed: "升级失败",
     cancel: "取消",
     saved: "已保存",
     currentPasswordRequired: "请输入当前密码"
@@ -133,6 +136,9 @@ const copyText = {
     onlineUpgrade: "Online upgrade",
     upgradeTip: "Upgrade creates a backup first. The panel may disconnect briefly. Run it during low traffic hours.",
     upgradeStarted: "Upgrade executed. Refresh the page later.",
+    upgrading: "Upgrading",
+    upgradeDone: "Upgrade complete. Refresh the page.",
+    upgradeFailed: "Upgrade failed",
     cancel: "Cancel",
     saved: "Saved",
     currentPasswordRequired: "Current password required"
@@ -413,13 +419,47 @@ function renderSettings() {
   $("#upgradeBtn").onclick = async () => {
     if (!confirm(t("upgradeTip"))) return;
     $("#upgradeBtn").disabled = true;
+    showUpgradeModal();
     try {
       await api("/api/v1/system/upgrade", { method: "POST", body: "{}" });
-      toast(t("upgradeStarted"));
+      pollUpgrade();
     } catch (e) {
       toast(e.message || t("upgradeStarted"));
+      $("#upgradeBtn").disabled = false;
     }
   };
+}
+
+function showUpgradeModal() {
+  const old = document.querySelector(".upgradeModal");
+  if (old) old.remove();
+  const modal = document.createElement("div");
+  modal.className = "modal upgradeModal";
+  modal.innerHTML = `<div class="dialog">
+    <div class="dialogHead"><div><h2>${t("upgrading")}</h2><p>${t("upgradeTip")}</p></div><button class="btn ghost" id="closeUpgrade">${t("cancel")}</button></div>
+    <div class="progressWrap"><div class="progressBar" id="upgradeBar" style="width:5%"></div></div>
+    <div class="notice" id="upgradeStep">Preparing...</div>
+    <pre class="upgradeLog" id="upgradeLog"></pre>
+  </div>`;
+  document.body.appendChild(modal);
+  $("#closeUpgrade").onclick = () => modal.remove();
+}
+
+async function pollUpgrade() {
+  try {
+    const st = await api("/api/v1/system/upgrade/status");
+    const bar = $("#upgradeBar");
+    const step = $("#upgradeStep");
+    const log = $("#upgradeLog");
+    if (bar) bar.style.width = `${Math.max(5, st.progress || 5)}%`;
+    if (step) step.textContent = st.error ? `${t("upgradeFailed")}: ${st.error}` : (st.progress >= 100 ? t("upgradeDone") : st.step);
+    if (log && st.output) log.textContent = st.output.slice(-4000);
+    if (st.running) {
+      setTimeout(pollUpgrade, 1500);
+    }
+  } catch {
+    setTimeout(pollUpgrade, 2000);
+  }
 }
 
 function nodeCard(n) {

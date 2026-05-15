@@ -82,6 +82,20 @@ go run ./cmd/easynode -addr :8088 -data data
 http://127.0.0.1:8088
 ```
 
+## 安全卸载
+
+默认卸载会停止服务、删除二进制和 systemd 文件，并把数据目录备份到 `/var/lib/easynode-uninstall-时间`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/uninstall.sh | bash
+```
+
+如果确认不要保留数据：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/uninstall.sh | bash -s -- --purge
+```
+
 ## 构建
 
 ```bash

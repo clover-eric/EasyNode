@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"easynode/internal/core/cert"
@@ -31,6 +32,18 @@ type Server struct {
 	dataDir string
 	static  embed.FS
 	mux     *http.ServeMux
+	upgrade upgradeState
+}
+
+type upgradeState struct {
+	mu        sync.RWMutex
+	Running   bool      `json:"running"`
+	Progress  int       `json:"progress"`
+	Step      string    `json:"step"`
+	Output    string    `json:"output,omitempty"`
+	Error     string    `json:"error,omitempty"`
+	Backup    string    `json:"backup,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func New(st *store.Store, dataDir string, static embed.FS) *Server {
@@ -52,6 +65,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/state", s.auth(s.State))
 	s.mux.HandleFunc("/api/v1/settings", s.auth(s.UpdateSettings))
 	s.mux.HandleFunc("/api/v1/system/upgrade", s.auth(s.Upgrade))
+	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
 	s.mux.HandleFunc("/api/v1/nodes", s.auth(s.Nodes))
 	s.mux.HandleFunc("/api/v1/nodes/", s.auth(s.NodeAction))
 	s.mux.HandleFunc("/api/v1/subscribe/", s.Subscribe)
@@ -206,18 +220,63 @@ func (s *Server) Upgrade(w http.ResponseWriter, r *http.Request) {
 		method(w)
 		return
 	}
+	s.upgrade.mu.Lock()
+	if s.upgrade.Running {
+		s.upgrade.mu.Unlock()
+		writeJSON(w, http.StatusAccepted, s.upgradeSnapshot())
+		return
+	}
+	s.upgrade.Running = true
+	s.upgrade.Progress = 5
+	s.upgrade.Step = "preparing backup"
+	s.upgrade.Output = ""
+	s.upgrade.Error = ""
+	s.upgrade.UpdatedAt = time.Now()
+	s.upgrade.mu.Unlock()
+
 	backup := filepath.Join(s.dataDir, "backup-"+time.Now().Format("20060102-150405"))
+	go s.runUpgrade(backup)
+	writeJSON(w, http.StatusAccepted, s.upgradeSnapshot())
+}
+
+func (s *Server) UpgradeStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.upgradeSnapshot())
+}
+
+func (s *Server) runUpgrade(backup string) {
+	s.setUpgrade(15, "backing up configuration", "", "", backup, true)
 	_ = os.MkdirAll(backup, 0700)
 	if b, err := os.ReadFile(filepath.Join(s.dataDir, "state.json")); err == nil {
 		_ = os.WriteFile(filepath.Join(backup, "state.json"), b, 0600)
 	}
+	s.setUpgrade(35, "downloading installer", "", "", backup, true)
 	cmd := exec.Command("bash", "-c", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "output": string(out), "backup": backup})
+		s.setUpgrade(100, "upgrade failed", string(out), err.Error(), backup, false)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "upgrade started", "output": string(out), "backup": backup})
+	s.setUpgrade(100, "upgrade complete, restarting", string(out), "", backup, false)
+}
+
+func (s *Server) setUpgrade(progress int, step, output, errText, backup string, running bool) {
+	s.upgrade.mu.Lock()
+	defer s.upgrade.mu.Unlock()
+	s.upgrade.Progress = progress
+	s.upgrade.Step = step
+	if output != "" {
+		s.upgrade.Output = output
+	}
+	s.upgrade.Error = errText
+	s.upgrade.Backup = backup
+	s.upgrade.Running = running
+	s.upgrade.UpdatedAt = time.Now()
+}
+
+func (s *Server) upgradeSnapshot() upgradeState {
+	s.upgrade.mu.RLock()
+	defer s.upgrade.mu.RUnlock()
+	return s.upgrade
 }
 
 func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
