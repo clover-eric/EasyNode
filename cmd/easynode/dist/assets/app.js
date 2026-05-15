@@ -30,6 +30,8 @@ const copyText = {
     deploying: "部署中...",
     setupNotice: "不知道怎么选就保留默认：日常首选 + 高速传输 + 兼容优先。高级方案可以以后再开。",
     loginIntro: "输入管理员密码进入面板。",
+    invalidPassword: "密码错误，请重新输入",
+    tooManyLoginAttempts: "密码错误次数过多，请稍后再试",
     securePanel: "安全面板",
     securePanelText: "会话隔离、密码哈希、配置本机保存",
     loginButton: "进入面板",
@@ -151,6 +153,8 @@ const copyText = {
     deploying: "Deploying...",
     setupNotice: "Not sure what to choose? Keep the defaults: Daily, Speed, and Compatibility. Advanced plans can be enabled later.",
     loginIntro: "Enter admin password to open the panel.",
+    invalidPassword: "Invalid password. Please try again.",
+    tooManyLoginAttempts: "Too many login attempts. Try again later.",
     securePanel: "Secure panel",
     securePanelText: "Session isolation, hashed password, local config storage",
     loginButton: "Open panel",
@@ -287,6 +291,8 @@ async function api(path, opts = {}) {
 function localizeError(msg) {
   if (msg === "password must be at least 8 characters") return t("passwordTooShort");
   if (msg === "domain required unless IP direct mode enabled") return t("domainRequired");
+  if (msg === "invalid password") return t("invalidPassword");
+  if (msg === "too many login attempts, try later") return t("tooManyLoginAttempts");
   return msg;
 }
 
@@ -442,17 +448,20 @@ function renderLogin() {
     <div class="loginForm">
       <div class="dialogHead"><div><h2>${t("securePanel")}</h2><p>${t("loginIntro")}</p></div>${langButton()}</div>
       <div class="field"><label>${t("adminPassword")}</label><input id="password" type="password" autofocus></div>
-      <button class="btn primary big" id="loginBtn">${t("loginButton")}</button><div id="err" class="error"></div>
+      <div id="err" class="error setupError" hidden></div><button class="btn primary big" id="loginBtn">${t("loginButton")}</button>
     </div>
   </section></main>`;
   $("#langBtn").onclick = switchLang;
   $("#loginBtn").onclick = async () => {
+    $("#err").hidden = true;
+    $("#err").textContent = "";
     try {
       await api("/api/v1/login", { method: "POST", body: JSON.stringify({ password: $("#password").value }) });
       state = await api("/api/v1/state");
       renderDashboard();
     } catch (e) {
       $("#err").textContent = e.message;
+      $("#err").hidden = false;
     }
   };
 }
