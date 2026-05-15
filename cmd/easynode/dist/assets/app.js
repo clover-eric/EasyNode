@@ -75,6 +75,8 @@ const copyText = {
     saveSettings: "保存设置",
     onlineUpgrade: "在线升级",
     upgradeTip: "升级会先备份配置，过程中面板可能短暂断开。建议在业务低峰操作。",
+    upgradeConfirmTitle: "确认在线升级",
+    upgradeConfirmText: "系统会先备份配置，然后拉取最新版本并重启服务。升级期间面板可能短暂断开。",
     upgradeStarted: "升级已执行，请稍后刷新页面",
     upgrading: "正在升级",
     upgradeDone: "升级完成，请刷新页面",
@@ -153,6 +155,8 @@ const copyText = {
     saveSettings: "Save settings",
     onlineUpgrade: "Online upgrade",
     upgradeTip: "Upgrade creates a backup first. The panel may disconnect briefly. Run it during low traffic hours.",
+    upgradeConfirmTitle: "Confirm online upgrade",
+    upgradeConfirmText: "EasyNode will back up config, pull the latest version, and restart services. The panel may disconnect briefly.",
     upgradeStarted: "Upgrade executed. Refresh the page later.",
     upgrading: "Upgrading",
     upgradeDone: "Upgrade complete. Refresh the page.",
@@ -479,15 +483,31 @@ function renderSettings() {
     }
   };
   $("#upgradeBtn").onclick = async () => {
-    if (!confirm(t("upgradeTip"))) return;
-    $("#upgradeBtn").disabled = true;
+    showUpgradeConfirm();
+  };
+}
+
+function showUpgradeConfirm() {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `<div class="dialog confirmDialog">
+    <div class="dialogHead"><div><h2>${t("upgradeConfirmTitle")}</h2><p>${t("upgradeConfirmText")}</p></div><button class="btn ghost" id="cancelUpgrade">${t("cancel")}</button></div>
+    <div class="notice">${t("upgradeTip")}</div>
+    <div class="row" style="margin-top:14px"><button class="btn primary" id="confirmUpgrade">${t("onlineUpgrade")}</button><button class="btn" id="cancelUpgrade2">${t("cancel")}</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  $("#cancelUpgrade").onclick = close;
+  $("#cancelUpgrade2").onclick = close;
+  $("#confirmUpgrade").onclick = async () => {
+    $("#confirmUpgrade").disabled = true;
+    modal.remove();
     showUpgradeModal();
     try {
       await api("/api/v1/system/upgrade", { method: "POST", body: "{}" });
       pollUpgrade();
     } catch (e) {
       toast(e.message || t("upgradeStarted"));
-      $("#upgradeBtn").disabled = false;
     }
   };
 }
@@ -515,13 +535,17 @@ async function pollUpgrade() {
     const log = $("#upgradeLog");
     if (bar) bar.style.width = `${Math.max(5, st.progress || 5)}%`;
     if (step) step.textContent = st.error ? `${t("upgradeFailed")}: ${st.error}` : (st.progress >= 100 ? t("upgradeDone") : st.step);
-    if (log && st.output) log.textContent = st.output.slice(-4000);
+    if (log && st.output) log.textContent = stripAnsi(st.output).slice(-4000);
     if (st.running) {
       setTimeout(pollUpgrade, 1500);
     }
   } catch {
     setTimeout(pollUpgrade, 2000);
   }
+}
+
+function stripAnsi(text) {
+  return String(text || "").replace(/\x1b\[[0-9;]*m/g, "");
 }
 
 function nodeCard(n) {

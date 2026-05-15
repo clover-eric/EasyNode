@@ -299,13 +299,27 @@ func (s *Server) runUpgrade(backup string) {
 		_ = os.WriteFile(filepath.Join(backup, "state.json"), b, 0600)
 	}
 	s.setUpgrade(35, "downloading installer", "", "", backup, true)
-	cmd := exec.Command("bash", "-c", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
+	cmd := exec.Command("systemd-run", "--unit=easynode-upgrade", "--collect", "bash", "-lc", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		s.setUpgrade(100, "upgrade failed", string(out), err.Error(), backup, false)
 		return
 	}
-	s.setUpgrade(100, "upgrade complete, restarting", string(out), "", backup, false)
+	s.setUpgrade(70, "upgrade task started", string(out), "", backup, true)
+	for i := 0; i < 30; i++ {
+		time.Sleep(2 * time.Second)
+		statusOut, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "80", "--no-pager").CombinedOutput()
+		s.setUpgrade(70+i, "installing update", string(statusOut), "", backup, true)
+		if !upgradeUnitActive() {
+			break
+		}
+	}
+	statusOut, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "120", "--no-pager").CombinedOutput()
+	s.setUpgrade(100, "upgrade complete, refreshing panel", string(statusOut), "", backup, false)
+}
+
+func upgradeUnitActive() bool {
+	return exec.Command("systemctl", "is-active", "--quiet", "easynode-upgrade").Run() == nil
 }
 
 func (s *Server) setUpgrade(progress int, step, output, errText, backup string, running bool) {
