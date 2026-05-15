@@ -42,7 +42,7 @@ func RestartService() error {
 	return exec.Command("systemctl", "restart", "easynode-singbox").Run()
 }
 
-func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer) (string, error) {
+func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, certPath, keyPath string) (string, error) {
 	cfg := map[string]any{
 		"log":      map[string]any{"level": "info"},
 		"inbounds": []any{},
@@ -58,10 +58,10 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer) (s
 		if n.Status != "running" {
 			continue
 		}
-		if n.Protocol != "vless-reality" {
+		if n.Protocol != "vless-reality" && (certPath == "" || keyPath == "") {
 			continue
 		}
-		inbounds = append(inbounds, inbound(n))
+		inbounds = append(inbounds, inbound(n, certPath, keyPath))
 	}
 	cfg["inbounds"] = inbounds
 	if len(peers) > 0 {
@@ -78,7 +78,7 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer) (s
 	return path, os.WriteFile(path, b, 0600)
 }
 
-func inbound(n model.Node) map[string]any {
+func inbound(n model.Node, certPath, keyPath string) map[string]any {
 	base := map[string]any{"type": protocolType(n.Protocol), "tag": n.ID, "listen": "::", "listen_port": n.Port}
 	switch n.Protocol {
 	case "vless-reality":
@@ -95,17 +95,17 @@ func inbound(n model.Node) map[string]any {
 		}
 	case "trojan-tls":
 		base["users"] = []any{map[string]any{"password": n.Password}}
-		base["tls"] = map[string]any{"enabled": true}
+		base["tls"] = map[string]any{"enabled": true, "certificate_path": certPath, "key_path": keyPath}
 	case "hysteria2":
 		base["users"] = []any{map[string]any{"password": n.Password}}
-		base["tls"] = map[string]any{"enabled": true}
+		base["tls"] = map[string]any{"enabled": true, "certificate_path": certPath, "key_path": keyPath}
 	case "tuic":
 		base["users"] = []any{map[string]any{"uuid": n.UUID, "password": n.Password}}
-		base["tls"] = map[string]any{"enabled": true}
+		base["tls"] = map[string]any{"enabled": true, "certificate_path": certPath, "key_path": keyPath}
 	case "vless-ws-tls":
 		base["users"] = []any{map[string]any{"uuid": n.UUID}}
 		base["transport"] = map[string]any{"type": "ws", "path": "/easynode"}
-		base["tls"] = map[string]any{"enabled": true}
+		base["tls"] = map[string]any{"enabled": true, "certificate_path": certPath, "key_path": keyPath}
 	}
 	return base
 }

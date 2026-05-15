@@ -131,7 +131,7 @@ pkg_update() {
 }
 
 pkg_deps() {
-  pkgs="curl ca-certificates tar gzip git make"
+  pkgs="curl ca-certificates tar gzip git make certbot"
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
     apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" $pkgs
@@ -160,8 +160,10 @@ EOF
 
 open_firewall() {
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi active; then
+    ufw allow "80/tcp" || true
     ufw allow "${PORT}/tcp" || true
   elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
+    firewall-cmd --permanent --add-port="80/tcp" || true
     firewall-cmd --permanent --add-port="${PORT}/tcp" || true
     firewall-cmd --reload || true
   else

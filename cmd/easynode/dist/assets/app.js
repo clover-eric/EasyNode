@@ -31,7 +31,7 @@ const copyText = {
     addProtocol: "添加协议",
     protocolLibrary: "协议库",
     availableNow: "可立即使用",
-    comingSoon: "证书接入后可用",
+    comingSoon: "输入域名并签发证书后可用",
     config: "sing-box 配置",
     logout: "退出",
     chainProxy: "链式代理",
@@ -97,7 +97,7 @@ const copyText = {
     addProtocol: "Add protocol",
     protocolLibrary: "Protocol library",
     availableNow: "Available now",
-    comingSoon: "Available after certificate support",
+    comingSoon: "Available after domain certificate is issued",
     config: "sing-box config",
     logout: "Log out",
     chainProxy: "Chain proxy",
@@ -248,6 +248,10 @@ function renderSetup(setup) {
         ip_direct: $("#ipDirect").checked,
         protocols
       })});
+      if (!$("#ipDirect").checked && $("#domain").value.trim() && location.hostname !== $("#domain").value.trim()) {
+        location.href = `${location.protocol}//${$("#domain").value.trim()}:8088`;
+        return;
+      }
       renderDashboard();
     } catch (e) {
       $("#err").textContent = e.message;

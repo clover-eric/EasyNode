@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"easynode/internal/core/cert"
 	"easynode/internal/core/chain"
 	"easynode/internal/core/detector"
 	"easynode/internal/core/recommender"
@@ -89,7 +90,21 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, errors.New("domain required unless IP direct mode enabled"))
 		return
 	}
+	certReady := false
+	certPath := ""
+	keyPath := ""
+	if !req.IPDirect {
+		c, err := cert.Ensure(req.Domain)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		certReady = c.Ready
+		certPath = c.CertPath
+		keyPath = c.KeyPath
+	}
 	env := detector.Detect(req.Domain, req.IPDirect)
+	env.TLSReady = certReady
 	recs := recommender.Recommend(env)
 	nodes := nodesFromRecommendations(recs, req.Protocols, req.Domain, req.IPDirect)
 	hash, err := util.HashPassword(req.Password)
@@ -110,6 +125,9 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 		}
 		st.Domain = req.Domain
 		st.IPDirect = req.IPDirect
+		st.CertReady = certReady
+		st.CertPath = certPath
+		st.KeyPath = keyPath
 		st.Nodes = nodes
 		return nil
 	}); err != nil {
@@ -117,7 +135,7 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st := s.store.Snapshot()
-	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers)
+	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 	_ = singbox.RestartService()
 	setSession(w, st.SessionToken)
 	writeJSON(w, http.StatusOK, publicState(st))
@@ -240,6 +258,19 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		newHash = hash
 	}
+	certReady := false
+	certPath := ""
+	keyPath := ""
+	if !req.IPDirect {
+		c, err := cert.Ensure(req.Domain)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		certReady = c.Ready
+		certPath = c.CertPath
+		keyPath = c.KeyPath
+	}
 	err := s.store.Update(func(st *model.AppState) error {
 		if newHash != "" {
 			st.AdminPasswordHash = newHash
@@ -250,13 +281,20 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		st.Domain = req.Domain
 		st.IPDirect = req.IPDirect
+		st.CertReady = certReady
+		st.CertPath = certPath
+		st.KeyPath = keyPath
 		host := req.Domain
 		if req.IPDirect || host == "" {
 			host = "127.0.0.1"
 		}
 		for i := range st.Nodes {
 			st.Nodes[i].Host = host
-			st.Nodes[i].SubscribeLink = subscribe.Link(st.Nodes[i])
+			if protocolRunnable(st.Nodes[i].Protocol, st.CertReady) && st.Nodes[i].Status == "running" {
+				st.Nodes[i].SubscribeLink = subscribe.Link(st.Nodes[i])
+			} else {
+				st.Nodes[i].SubscribeLink = ""
+			}
 		}
 		return nil
 	})
@@ -265,7 +303,7 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	next := s.store.Snapshot()
-	_, _ = singbox.WriteConfig(s.dataDir, next.Nodes, next.ChainPeers)
+	_, _ = singbox.WriteConfig(s.dataDir, next.Nodes, next.ChainPeers, next.CertPath, next.KeyPath)
 	_ = singbox.RestartService()
 	if newHash != "" {
 		setSession(w, next.SessionToken)
@@ -287,7 +325,7 @@ func (s *Server) NodeAction(w http.ResponseWriter, r *http.Request) {
 	err := s.store.Update(func(st *model.AppState) error {
 		for i := range st.Nodes {
 			if st.Nodes[i].ID == id {
-				if !protocolRunnable(st.Nodes[i].Protocol) {
+				if !protocolRunnable(st.Nodes[i].Protocol, st.CertReady) {
 					return errors.New(protocolUnavailableReason(st.Nodes[i].Protocol))
 				}
 				if st.Nodes[i].Status == "running" {
@@ -305,7 +343,7 @@ func (s *Server) NodeAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st := s.store.Snapshot()
-	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers)
+	_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 	_ = singbox.RestartService()
 	writeJSON(w, http.StatusOK, st.Nodes)
 }
@@ -385,7 +423,7 @@ func (s *Server) Pair(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) SingBoxConfig(w http.ResponseWriter, r *http.Request) {
 	st := s.store.Snapshot()
-	path, err := singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers)
+	path, err := singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -466,7 +504,7 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 			n.RealityPrivateKey = m.PrivateKey
 			n.RealityPublicKey = m.PublicKey
 			n.RealityShortID = m.ShortID
-		} else if !protocolRunnable(n.Protocol) {
+		} else if !protocolRunnable(n.Protocol, false) {
 			n.Status = "stopped"
 		}
 		lat := 18 + len(nodes)*11
@@ -479,8 +517,16 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 	return nodes
 }
 
-func protocolRunnable(protocol string) bool {
-	return protocol == "vless-reality"
+func protocolRunnable(protocol string, certReady bool) bool {
+	if protocol == "vless-reality" {
+		return true
+	}
+	switch protocol {
+	case "trojan-tls", "hysteria2", "vless-ws-tls", "tuic":
+		return certReady
+	default:
+		return false
+	}
 }
 
 func protocolUnavailableReason(protocol string) string {
@@ -514,6 +560,12 @@ func (s *Server) ensureRunnableNodes() error {
 				n.SubscribeLink = subscribe.Link(*n)
 				continue
 			}
+			if protocolRunnable(n.Protocol, st.CertReady) {
+				if n.Status == "running" {
+					n.SubscribeLink = subscribe.Link(*n)
+				}
+				continue
+			}
 			if n.Status == "running" {
 				n.Status = "stopped"
 				changed = true
@@ -527,7 +579,7 @@ func (s *Server) ensureRunnableNodes() error {
 	}
 	if changed {
 		st := s.store.Snapshot()
-		_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers)
+		_, _ = singbox.WriteConfig(s.dataDir, st.Nodes, st.ChainPeers, st.CertPath, st.KeyPath)
 		_ = singbox.RestartService()
 	}
 	return nil

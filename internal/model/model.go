@@ -12,6 +12,9 @@ type AppState struct {
 	LockoutUntil      time.Time     `json:"lockout_until,omitempty"`
 	Domain            string        `json:"domain"`
 	IPDirect          bool          `json:"ip_direct"`
+	CertReady         bool          `json:"cert_ready"`
+	CertPath          string        `json:"cert_path,omitempty"`
+	KeyPath           string        `json:"key_path,omitempty"`
 	SubscribeKey      string        `json:"subscribe_key"`
 	Nodes             []Node        `json:"nodes"`
 	ChainPeers        []ChainPeer   `json:"chain_peers"`
