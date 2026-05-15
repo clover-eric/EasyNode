@@ -65,6 +65,10 @@ const copyText = {
     ipPurity: "IP 纯净度",
     checking: "检测中...",
     purityHint: "基于公开 IP 信誉信号的基础判断，仅作参考。",
+    ipType: "IP 类型",
+    nativeCheck: "原生倾向",
+    useCases: "适用场景",
+    risks: "风险提示",
     copyLink: "复制链接",
     showQR: "二维码",
     scanToImport: "扫码导入",
@@ -152,6 +156,10 @@ const copyText = {
     ipPurity: "IP purity",
     checking: "Checking...",
     purityHint: "Basic public IP reputation heuristic. For reference only.",
+    ipType: "IP type",
+    nativeCheck: "Native tendency",
+    useCases: "Use cases",
+    risks: "Risk flags",
     copyLink: "Copy link",
     showQR: "QR code",
     scanToImport: "Scan to import",
@@ -609,7 +617,13 @@ async function showPurity() {
   $("#closePurity").onclick = () => modal.remove();
   try {
     const r = await api("/api/v1/ip/purity");
-    $("#purityBody").innerHTML = `<div class="purityScore">${r.score}<span>/100</span></div><p>${r.level || ""} · ${r.ip || ""}</p><p>${r.country || ""} ${r.asn || ""}</p><p>${r.isp || ""}</p><p>${(r.risks || []).join("<br>") || "No obvious risk flag"}</p>`;
+    $("#purityBody").innerHTML = `<div class="purityGrid">
+      <div class="purityMain"><div class="purityScore">${r.score}<span>/100</span></div><p>${r.level || ""} · ${r.ip || ""}</p><p>${r.country || ""} ${r.asn || ""}</p><p>${r.isp || ""}</p></div>
+      <div class="purityMeta"><b>${t("ipType")}</b><span>${r.ip_type || "-"}</span></div>
+      <div class="purityMeta"><b>${t("nativeCheck")}</b><span>${r.native || "-"}</span></div>
+      <div class="purityMeta wide"><b>${t("risks")}</b><span>${(r.risks || []).join("<br>") || "No obvious risk flag"}</span></div>
+      <div class="purityMeta wide"><b>${t("useCases")}</b>${(r.use_cases || []).map(x => `<span>${x.name}: ${x.status} - ${x.reason}</span>`).join("")}</div>
+    </div>`;
   } catch (e) {
     $("#purityBody").textContent = e.message;
   }
