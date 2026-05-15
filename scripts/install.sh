@@ -61,6 +61,38 @@ log() { printf '\033[1;32m[EasyNode]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[EasyNode]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[EasyNode]\033[0m %s\n' "$*" >&2; exit 1; }
 
+wait_for_apt_lock() {
+  command -v apt-get >/dev/null 2>&1 || return 0
+  locks="/var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock /var/lib/apt/lists/lock"
+  waited=0
+  while apt_lock_busy "$locks"; do
+    if [ "$waited" -eq 0 ]; then
+      warn "Another apt/dpkg task is running, waiting for package manager lock"
+    fi
+    if [ "$waited" -ge 600 ]; then
+      die "Package manager is still locked after 10 minutes. Run: ps -fp \$(fuser $locks 2>/dev/null | tr ' ' ',')"
+    fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+}
+
+apt_lock_busy() {
+  locks="$1"
+  if command -v fuser >/dev/null 2>&1 && fuser $locks >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v ps >/dev/null 2>&1 && ps -eo comm= 2>/dev/null | grep -Eq '^(apt|apt-get|apt\.systemd\.daily|dpkg|unattended-upgrade)$'; then
+    return 0
+  fi
+  return 1
+}
+
+apt_get() {
+  wait_for_apt_lock
+  apt-get -o DPkg::Lock::Timeout=600 "$@"
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --yes) ASSUME_YES="1" ;;
@@ -130,8 +162,8 @@ ask() {
 
 pkg_update() {
   if command -v apt-get >/dev/null 2>&1; then
-    apt-get update -y
-    apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+    apt_get update -y
+    apt_get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
   elif command -v dnf >/dev/null 2>&1; then
     dnf upgrade -y
   elif command -v yum >/dev/null 2>&1; then
@@ -144,8 +176,8 @@ pkg_update() {
 pkg_deps() {
   pkgs="curl ca-certificates tar gzip git make certbot iptables"
   if command -v apt-get >/dev/null 2>&1; then
-    apt-get update -y
-    apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" $pkgs
+    apt_get update -y
+    apt_get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" $pkgs
   elif command -v dnf >/dev/null 2>&1; then
     dnf install -y $pkgs
   elif command -v yum >/dev/null 2>&1; then
@@ -247,8 +279,8 @@ install_go_if_missing() {
   fi
   log "Installing Go toolchain"
   if command -v apt-get >/dev/null 2>&1; then
-    apt-get update -y
-    apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" golang-go
+    apt_get update -y
+    apt_get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" golang-go
   elif command -v dnf >/dev/null 2>&1; then
     dnf install -y golang
   elif command -v yum >/dev/null 2>&1; then
@@ -264,6 +296,7 @@ install_sing_box() {
   fi
   log "Installing sing-box core"
   if command -v apt-get >/dev/null 2>&1; then
+    wait_for_apt_lock
     curl -fsSL https://sing-box.app/deb-install.sh | bash
   else
     die "Automatic sing-box install currently supports Debian/Ubuntu only"
