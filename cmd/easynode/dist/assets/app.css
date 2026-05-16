@@ -63,13 +63,13 @@ html{min-height:100%;background:#062f2c}
 body{min-height:100%;background-color:#062f2c;background-image:radial-gradient(circle at 18% 0%,rgba(6,182,212,.18),transparent 30%),radial-gradient(circle at 88% 8%,rgba(34,197,94,.14),transparent 32%),linear-gradient(180deg,#062f2c 0,#071817 260px,var(--bg) 620px)}
 #app{min-height:100vh;background:transparent}
 @media(max-width:430px){
-  .shell{padding-top:calc(env(safe-area-inset-top,0px) + 72px)!important;padding-right:calc(env(safe-area-inset-right,0px) + 18px)!important;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 28px)!important;padding-left:calc(env(safe-area-inset-left,0px) + 18px)!important}
+  .shell{padding-top:calc(env(safe-area-inset-top,0px) + 14px)!important;padding-right:calc(env(safe-area-inset-right,0px) + 14px)!important;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px)!important;padding-left:calc(env(safe-area-inset-left,0px) + 14px)!important}
   .dashboardTop{margin-top:0}
-  .bootShell{padding-top:calc(env(safe-area-inset-top,0px) + 72px)!important}
+  .bootShell{padding-top:calc(env(safe-area-inset-top,0px) + 14px)!important}
 }
 @media(display-mode:standalone) and (max-width:430px){
-  .shell{padding-top:calc(env(safe-area-inset-top,0px) + 82px)!important}
-  .bootShell{padding-top:calc(env(safe-area-inset-top,0px) + 82px)!important}
+  .shell{padding-top:calc(env(safe-area-inset-top,0px) + 18px)!important}
+  .bootShell{padding-top:calc(env(safe-area-inset-top,0px) + 18px)!important}
 }
 .card .row .btn{display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
 .card .row .btn[data-node-shadowrocket]{font-size:14px}
@@ -79,3 +79,38 @@ body{min-height:100%;background-color:#062f2c;background-image:radial-gradient(c
 .card.switching:after,.card.pending:after,.protocolOption.adding:after,.protocolOption.removing:after,.chainPeer.removing:after,.notice.pending:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,#67e8f9,#22c55e,transparent);animation:btnLoad .95s linear infinite}
 .protocolOption.removing,.chainPeer.removing{opacity:.58;transform:scale(.985)}.protocolOption.adding{background:linear-gradient(180deg,rgba(6,182,212,.14),rgba(13,13,16,.95))}.protocolOption.done{opacity:0;transform:scale(.97);transition:.18s opacity,.18s transform}.card.switching .dot{animation:pulseDot .8s ease-in-out infinite}.card.switching.stopped .dot{background:var(--green);box-shadow:0 0 14px var(--green)}
 @keyframes pulseDot{0%,100%{transform:scale(1);opacity:.75}50%{transform:scale(1.45);opacity:1}}
+html,body,#app{min-height:100dvh}
+@supports(-webkit-touch-callout:none){
+  html,body,#app{min-height:-webkit-fill-available}
+}
+.dashboardTop,.card,.panel,.bootCard,.modal{-webkit-backdrop-filter:blur(14px)}
+.brand,.brandBlock,.actionPanel,.actionGroup,.card,.stat,.chainPeer,.panel,.dialog{min-width:0}
+.btn,input,textarea{max-width:100%}
+textarea{font:inherit}
+@media(min-width:431px) and (max-width:680px){
+  .shell{padding:calc(env(safe-area-inset-top,0px) + 18px) calc(env(safe-area-inset-right,0px) + 18px) calc(env(safe-area-inset-bottom,0px) + 26px) calc(env(safe-area-inset-left,0px) + 18px)}
+  .dashboardTop{margin-bottom:14px}
+  .brandBlock{grid-template-columns:1fr;justify-content:stretch}
+  .actionPanel{display:grid;grid-template-columns:1fr}
+  .actionGroup{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .subtleGroup{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .actionGroup .btn{width:100%;white-space:normal;overflow-wrap:anywhere}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .stat{padding:9px 7px}
+  .stat b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+@media(max-width:430px){
+  h1,.brand h1{font-size:22px;line-height:1.08}
+  .dashboardTop{padding:12px}
+  .brand p{max-width:calc(100vw - 112px)}
+  .topMeta span{font-size:12px;overflow-wrap:anywhere}
+  .primaryGroup,.actionGroup,.subtleGroup{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .subtleGroup .langBtn{grid-column:auto}
+  .actionGroup .btn{white-space:normal;overflow-wrap:anywhere}
+}
+@media(max-width:360px){
+  .shell{padding-left:10px!important;padding-right:10px!important}
+  .actionGroup,.primaryGroup,.subtleGroup{grid-template-columns:1fr}
+  .row .btn{min-width:100%}
+  .stats{grid-template-columns:1fr}
+}
