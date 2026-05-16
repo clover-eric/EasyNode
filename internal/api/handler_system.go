@@ -101,14 +101,21 @@ func (s *Server) checkUpdateInfo() updateInfo {
 }
 
 func fetchGitHubCommits() ([]updateNote, error) {
-	client := http.Client{Timeout: 4 * time.Second}
-	resp, err := client.Get("https://api.github.com/repos/clover-eric/EasyNode/commits?sha=main&per_page=5")
+	client := http.Client{Timeout: 8 * time.Second}
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/clover-eric/EasyNode/commits?sha=main&per_page=5", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "EasyNode-Updater")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("cannot check GitHub updates")
+		return nil, errors.New("GitHub API returned status " + resp.Status)
 	}
 	var data []struct {
 		SHA    string `json:"sha"`
@@ -140,24 +147,36 @@ func (s *Server) runUpgrade(backup string) {
 	if b, err := os.ReadFile(filepath.Join(s.dataDir, "state.json")); err == nil {
 		_ = os.WriteFile(filepath.Join(backup, "state.json"), b, 0600)
 	}
+
 	s.setUpgrade(35, "downloading installer", "", "", backup, true)
 	_ = exec.Command("systemctl", "reset-failed", "easynode-upgrade").Run()
-	cmd := exec.Command("systemd-run", "--unit=easynode-upgrade", "--setenv=HOME=/root", "--setenv=GOCACHE=/tmp/easynode-gocache", "--setenv=GOMODCACHE=/tmp/easynode-gomodcache", "bash", "-lc", "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr")
+
+	installCmd := "curl -fsSL https://raw.githubusercontent.com/clover-eric/EasyNode/main/scripts/install.sh | bash -s -- --yes --repo clover-eric/EasyNode --skip-upgrade --skip-bbr --skip-firewall"
+	cmd := exec.Command("systemd-run",
+		"--unit=easynode-upgrade",
+		"--setenv=HOME=/root",
+		"--setenv=GOCACHE=/tmp/easynode-gocache",
+		"--setenv=GOMODCACHE=/tmp/easynode-gomodcache",
+		"bash", "-lc", installCmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		s.setUpgrade(100, "upgrade failed", string(out), err.Error(), backup, false)
+		s.setUpgrade(100, "upgrade failed", string(out), "failed to start upgrade task: "+err.Error(), backup, false)
 		return
 	}
+
 	s.setUpgrade(70, "upgrade task started", string(out), "", backup, true)
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 40; i++ {
 		time.Sleep(2 * time.Second)
-		statusOut, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "80", "--no-pager").CombinedOutput()
-		s.setUpgrade(70+i, "installing update", string(statusOut), "", backup, true)
+		statusOut, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "100", "--no-pager").CombinedOutput()
+		logs := string(statusOut)
+		progress := inferUpgradeProgress(logs)
+		s.setUpgrade(progress, "installing update", logs, "", backup, true)
 		if !upgradeUnitActive() {
 			break
 		}
 	}
-	statusOut, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "120", "--no-pager").CombinedOutput()
+
+	statusOut, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "150", "--no-pager").CombinedOutput()
 	result, code := upgradeUnitResult()
 	if result != "success" || code != "0" {
 		s.setUpgrade(100, "upgrade failed", string(statusOut), "upgrade task failed: result="+result+" status="+code, backup, false)
@@ -188,10 +207,11 @@ func upgradeUnitResult() (string, string) {
 }
 
 func systemdUpgradeStatus() upgradeState {
-	out, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "120", "--no-pager").CombinedOutput()
+	out, _ := exec.Command("journalctl", "-u", "easynode-upgrade", "-n", "150", "--no-pager").CombinedOutput()
 	logs := string(out)
 	active := exec.Command("systemctl", "is-active", "--quiet", "easynode-upgrade").Run() == nil
 	result, code := upgradeUnitResult()
+
 	st := upgradeState{
 		Running:   active,
 		Progress:  0,
@@ -199,22 +219,26 @@ func systemdUpgradeStatus() upgradeState {
 		Output:    logs,
 		UpdatedAt: time.Now(),
 	}
+
 	if active {
 		st.Progress = inferUpgradeProgress(logs)
 		st.Step = "installing update"
 		return st
 	}
+
 	if strings.Contains(logs, "EasyNode installed.") || (result == "success" && code == "0") {
 		st.Progress = 100
 		st.Step = "upgrade complete, refreshing panel"
 		return st
 	}
+
 	if result != "unknown" && result != "" && result != "success" {
 		st.Progress = 100
 		st.Step = "upgrade failed"
 		st.Error = "upgrade task failed: result=" + result + " status=" + code
 		return st
 	}
+
 	return upgradeState{}
 }
 
@@ -226,12 +250,13 @@ func inferUpgradeProgress(logs string) int {
 	}{
 		{"[1/8]", 15},
 		{"[2/8]", 25},
-		{"[3/8]", 40},
-		{"[4/8]", 52},
-		{"[5/8]", 65},
-		{"[6/8]", 78},
-		{"[7/8]", 88},
+		{"[3/8]", 35},
+		{"[4/8]", 45},
+		{"[5/8]", 60},
+		{"[6/8]", 72},
+		{"[7/8]", 85},
 		{"[8/8]", 95},
+		{"EasyNode installed.", 100},
 	}
 	for _, m := range markers {
 		if strings.Contains(logs, m.text) {
