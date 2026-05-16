@@ -134,3 +134,6 @@ textarea{font:inherit}
   .shell{padding-top:clamp(40px,calc(env(safe-area-inset-top,0px) + 10px),58px)!important}
   .dashboardTop{margin-top:0!important}
 }
+@media(max-width:680px){
+  html,body,#app{background:#071817!important;background-image:none!important}
+}
