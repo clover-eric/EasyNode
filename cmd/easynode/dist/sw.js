@@ -1,5 +1,5 @@
-const CACHE_NAME = "easynode-shell-v1";
-const SHELL_ASSETS = ["/", "/assets/app.css", "/assets/app.js", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE_NAME = "easynode-shell-v20260516-2";
+const SHELL_ASSETS = ["/", "/assets/app.css?v=20260516-2", "/assets/app.js?v=20260516-2", "/manifest.webmanifest", "/favicon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)).catch(() => undefined));

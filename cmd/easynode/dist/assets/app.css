@@ -130,3 +130,7 @@ textarea{font:inherit}
     .bootShell{padding-top:18px!important}
   }
 }
+@media(max-width:680px){
+  .shell{padding-top:8px!important}
+  .dashboardTop{margin-top:0!important}
+}
