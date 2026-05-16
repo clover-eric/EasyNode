@@ -444,6 +444,14 @@ func (s *Server) AddNode(w http.ResponseWriter, r *http.Request) {
 		host := configuredHost(st.Domain, st.IPDirect, r)
 		node := newNodeFromRecommendation(*rec, host, st.CertReady)
 		st.Nodes = append(st.Nodes, node)
+		if req.Protocol == "clash" && !hasProtocol(st.Nodes, "shadowsocks") {
+			for _, dep := range recs {
+				if dep.Protocol == "shadowsocks" {
+					st.Nodes = append(st.Nodes, newNodeFromRecommendation(dep, host, st.CertReady))
+					break
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -1389,7 +1397,7 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, ho
 }
 
 func newNodeFromRecommendation(rec model.Recommendation, host string, certReady bool) model.Node {
-	ports := map[string]int{"vless-reality": 443, "hysteria2": 8443, "trojan-tls": 2053, "vless-ws-tls": 2083, "tuic": 9443, "clash": 0}
+	ports := map[string]int{"vless-reality": 443, "shadowsocks": 8388, "hysteria2": 8443, "trojan-tls": 2053, "vless-ws-tls": 2083, "tuic": 9443, "clash": 0}
 	n := model.Node{
 		ID: rec.Protocol, Protocol: rec.Protocol, Transport: rec.Transport, Security: rec.Security,
 		Label: rec.Label, Description: rec.Description, Priority: rec.Priority, Status: "running",
@@ -1414,7 +1422,7 @@ func newNodeFromRecommendation(rec model.Recommendation, host string, certReady 
 }
 
 func protocolRunnable(protocol string, certReady bool) bool {
-	if protocol == "vless-reality" || protocol == "clash" {
+	if protocol == "vless-reality" || protocol == "shadowsocks" || protocol == "clash" {
 		return true
 	}
 	switch protocol {
@@ -1539,6 +1547,15 @@ func (s *Server) ensureRunnableNodes() error {
 			}
 			n.SubscribeLink = ""
 		}
+		if hasProtocol(st.Nodes, "clash") && !hasProtocol(st.Nodes, "shadowsocks") {
+			for _, rec := range recommender.Recommend(model.Environment{HasIPv4: true}) {
+				if rec.Protocol == "shadowsocks" {
+					st.Nodes = append(st.Nodes, newNodeFromRecommendation(rec, host, st.CertReady))
+					changed = true
+					break
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -1550,6 +1567,15 @@ func (s *Server) ensureRunnableNodes() error {
 		_ = singbox.RestartService()
 	}
 	return nil
+}
+
+func hasProtocol(nodes []model.Node, protocol string) bool {
+	for _, n := range nodes {
+		if n.Protocol == protocol {
+			return true
+		}
+	}
+	return false
 }
 
 func setSession(w http.ResponseWriter, token string) {

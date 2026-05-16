@@ -3,7 +3,11 @@ package singbox
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"os"
+	"strings"
 	"testing"
+
+	"easynode/internal/model"
 )
 
 func TestGenerateRealityMaterialFallback(t *testing.T) {
@@ -21,6 +25,30 @@ func TestGenerateRealityMaterialFallback(t *testing.T) {
 	}
 	if len(private) != 32 || len(public) != 32 {
 		t.Fatalf("reality keys should be 32-byte X25519 keys, got %d/%d", len(private), len(public))
+	}
+}
+
+func TestWriteConfigIncludesShadowsocksInboundWithoutCert(t *testing.T) {
+	dir := t.TempDir()
+	path, err := WriteConfig(dir, []model.Node{{
+		ID:       "shadowsocks",
+		Protocol: "shadowsocks",
+		Status:   "running",
+		Port:     8388,
+		Password: "secret",
+	}}, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := string(b)
+	for _, want := range []string{`"type": "shadowsocks"`, `"listen_port": 8388`, `"method": "chacha20-ietf-poly1305"`} {
+		if !strings.Contains(cfg, want) {
+			t.Fatalf("config missing %s:\n%s", want, cfg)
+		}
 	}
 }
 

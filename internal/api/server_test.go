@@ -44,3 +44,13 @@ func TestNodesForRequestRewritesIPDirectLoopback(t *testing.T) {
 		t.Fatalf("SubscribeLink was not rewritten: %s", nodes[0].SubscribeLink)
 	}
 }
+
+func TestShadowsocksRunnableWithoutCert(t *testing.T) {
+	if !protocolRunnable("shadowsocks", false) {
+		t.Fatal("shadowsocks should run without certificate")
+	}
+	n := newNodeFromRecommendation(model.Recommendation{Protocol: "shadowsocks"}, "203.0.113.10", false)
+	if n.Status != "running" || n.Port != 8388 || n.Password == "" {
+		t.Fatalf("unexpected shadowsocks node: %#v", n)
+	}
+}

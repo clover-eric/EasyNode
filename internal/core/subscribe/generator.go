@@ -21,7 +21,10 @@ func Link(n model.Node) string {
 	name := url.QueryEscape("EasyNode " + n.Protocol)
 	switch n.Protocol {
 	case "vless-reality":
-		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp&sni=www.microsoft.com&fp=chrome&pbk=%s&sid=%s#%s", n.UUID, host, n.Port, url.QueryEscape(n.RealityPublicKey), url.QueryEscape(n.RealityShortID), name)
+		return fmt.Sprintf("vless://%s@%s:%d?encryption=none&security=reality&type=tcp&sni=www.microsoft.com&fp=chrome&pbk=%s&sid=%s#%s", n.UUID, host, n.Port, url.QueryEscape(n.RealityPublicKey), url.QueryEscape(n.RealityShortID), name)
+	case "shadowsocks":
+		user := base64.RawURLEncoding.EncodeToString([]byte("chacha20-ietf-poly1305:" + n.Password))
+		return fmt.Sprintf("ss://%s@%s:%d#%s", user, host, n.Port, name)
 	case "trojan-tls":
 		return fmt.Sprintf("trojan://%s@%s:%d?security=tls&type=tcp&sni=%s#%s", n.Password, host, n.Port, host, name)
 	case "hysteria2":
@@ -140,6 +143,13 @@ func clashProxyForNode(n model.Node) (clashProxy, bool) {
 	b.WriteString(clashQuote(name))
 	b.WriteByte('\n')
 	switch n.Protocol {
+	case "shadowsocks":
+		writeClashKV(&b, "type", "ss")
+		writeClashKV(&b, "server", host)
+		writeClashInt(&b, "port", n.Port)
+		writeClashKV(&b, "cipher", "chacha20-ietf-poly1305")
+		writeClashKV(&b, "password", n.Password)
+		writeClashKV(&b, "udp", "true")
 	case "vless-reality":
 		writeClashKV(&b, "type", "vless")
 		writeClashKV(&b, "server", host)
@@ -148,7 +158,6 @@ func clashProxyForNode(n model.Node) (clashProxy, bool) {
 		writeClashKV(&b, "network", "tcp")
 		writeClashKV(&b, "tls", "true")
 		writeClashKV(&b, "udp", "true")
-		writeClashKV(&b, "flow", "xtls-rprx-vision")
 		writeClashKV(&b, "servername", "www.microsoft.com")
 		writeClashKV(&b, "client-fingerprint", "chrome")
 		writeClashKV(&b, "skip-cert-verify", "false")

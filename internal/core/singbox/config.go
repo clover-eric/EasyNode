@@ -181,7 +181,7 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, ce
 		if n.Protocol == "clash" {
 			continue
 		}
-		if n.Protocol != "vless-reality" && (certPath == "" || keyPath == "") {
+		if n.Protocol != "vless-reality" && n.Protocol != "shadowsocks" && (certPath == "" || keyPath == "") {
 			continue
 		}
 		inbounds = append(inbounds, inbound(n, certPath, keyPath))
@@ -217,7 +217,9 @@ func chainOutbound(peer model.ChainPeer) map[string]any {
 			"uuid":        strings.TrimPrefix(u.User.String(), ""),
 		}
 		if values.Get("security") == "reality" {
-			out["flow"] = values.Get("flow")
+			if values.Get("flow") != "" {
+				out["flow"] = values.Get("flow")
+			}
 			out["tls"] = map[string]any{
 				"enabled":     true,
 				"server_name": values.Get("sni"),
@@ -249,6 +251,16 @@ func chainOutbound(peer model.ChainPeer) map[string]any {
 		out := map[string]any{"type": "hysteria2", "server": u.Hostname(), "server_port": port, "password": password}
 		out["tls"] = map[string]any{"enabled": true, "server_name": values.Get("sni")}
 		return out
+	case "ss":
+		user := u.User.Username()
+		if decoded, err := base64.RawURLEncoding.DecodeString(user); err == nil {
+			user = string(decoded)
+		}
+		method, password, ok := strings.Cut(user, ":")
+		if !ok {
+			return nil
+		}
+		return map[string]any{"type": "shadowsocks", "server": u.Hostname(), "server_port": port, "method": method, "password": password}
 	default:
 		return nil
 	}
@@ -264,8 +276,11 @@ func valueOr(v, fallback string) string {
 func inbound(n model.Node, certPath, keyPath string) map[string]any {
 	base := map[string]any{"type": protocolType(n.Protocol), "tag": n.ID, "listen": "::", "listen_port": n.Port}
 	switch n.Protocol {
+	case "shadowsocks":
+		base["method"] = "chacha20-ietf-poly1305"
+		base["password"] = n.Password
 	case "vless-reality":
-		base["users"] = []any{map[string]any{"uuid": n.UUID, "flow": "xtls-rprx-vision"}}
+		base["users"] = []any{map[string]any{"uuid": n.UUID}}
 		base["tls"] = map[string]any{
 			"enabled":     true,
 			"server_name": "www.microsoft.com",
@@ -297,6 +312,8 @@ func protocolType(p string) string {
 	switch p {
 	case "vless-reality", "vless-ws-tls":
 		return "vless"
+	case "shadowsocks":
+		return "shadowsocks"
 	case "trojan-tls":
 		return "trojan"
 	case "hysteria2":

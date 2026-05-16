@@ -206,10 +206,14 @@ open_firewall() {
     ufw allow "80/tcp" || true
     ufw allow "${PORT}/tcp" || true
     ufw allow "${TLS_PORT}/tcp" || true
+    ufw allow "8388/tcp" || true
+    ufw allow "8388/udp" || true
   elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
     firewall-cmd --permanent --add-port="80/tcp" || true
     firewall-cmd --permanent --add-port="${PORT}/tcp" || true
     firewall-cmd --permanent --add-port="${TLS_PORT}/tcp" || true
+    firewall-cmd --permanent --add-port="8388/tcp" || true
+    firewall-cmd --permanent --add-port="8388/udp" || true
     firewall-cmd --reload || true
   else
     warn "No active ufw/firewalld detected, skip firewall rule"
@@ -263,11 +267,11 @@ setup_traffic_counters() {
   iptables -N EASYNODE_TRAFFIC_OUT 2>/dev/null || true
   iptables -C INPUT -j EASYNODE_TRAFFIC_IN 2>/dev/null || iptables -I INPUT -j EASYNODE_TRAFFIC_IN
   iptables -C OUTPUT -j EASYNODE_TRAFFIC_OUT 2>/dev/null || iptables -I OUTPUT -j EASYNODE_TRAFFIC_OUT
-  for port in 443 2053; do
+  for port in 443 2053 8388; do
     iptables -C EASYNODE_TRAFFIC_IN -p tcp --dport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_IN -p tcp --dport "$port" -j RETURN
     iptables -C EASYNODE_TRAFFIC_OUT -p tcp --sport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_OUT -p tcp --sport "$port" -j RETURN
   done
-  for port in 8443 9443; do
+  for port in 8443 9443 8388; do
     iptables -C EASYNODE_TRAFFIC_IN -p udp --dport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_IN -p udp --dport "$port" -j RETURN
     iptables -C EASYNODE_TRAFFIC_OUT -p udp --sport "$port" -j RETURN 2>/dev/null || iptables -A EASYNODE_TRAFFIC_OUT -p udp --sport "$port" -j RETURN
   done

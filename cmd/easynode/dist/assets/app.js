@@ -268,6 +268,7 @@ const copyText = {
 const profiles = {
   zh: {
     "vless-reality": ["日常首选", "VLESS Reality", "5/5", "v2rayN, Nekoray, Shadowrocket, sing-box", "网页、视频、聊天、长期稳定使用", "不需要域名证书，伪装能力强，默认建议开启。", "部分旧客户端不支持 Reality。", true],
+    "shadowsocks": ["Clash 兼容", "Shadowsocks AEAD", "5/5", "Clash, Stash, Shadowrocket, sing-box", "Clash 客户端、IP 直连、少折腾使用", "Clash 原生支持，不需要域名证书，适合作为 Clash 订阅的默认可用节点。", "伪装能力低于 Reality。", true],
     "hysteria2": ["高速传输", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "移动网络、跨境视频、下载、UDP 通畅线路", "基于 QUIC，弱网和高延迟线路上通常更快。", "需要域名证书；默认勾选，系统会自动尝试配置。", true],
     "trojan-tls": ["兼容优先", "Trojan TLS", "4/5", "几乎所有主流代理客户端", "给家人朋友用、旧客户端、追求少折腾", "形态接近普通 HTTPS，客户端兼容性最好。", "需要域名和 TLS 证书；默认勾选，系统会自动尝试配置。", true],
     "clash": ["Clash 分流", "Clash/Mihomo", "4/5", "Clash Verge, Mihomo Party, Stash", "需要自动测速、精准分流、统一导入的客户端", "生成 Clash/Mihomo YAML 订阅，内置国内直连、国外代理、广告拦截和自动测速。", "这是客户端订阅配置，不会新增服务器入站端口。", false],
@@ -276,6 +277,7 @@ const profiles = {
   },
   en: {
     "vless-reality": ["Daily default", "VLESS Reality", "5/5", "v2rayN, Nekoray, Shadowrocket, sing-box", "Browsing, video, chat, long-term stable use", "No domain certificate required. Strong camouflage and best default choice.", "Some older clients do not support Reality.", true],
+    "shadowsocks": ["Clash compatible", "Shadowsocks AEAD", "5/5", "Clash, Stash, Shadowrocket, sing-box", "Clash clients, IP direct mode, low-friction use", "Native Clash support. No domain certificate required. Best default carrier for Clash subscriptions.", "Less camouflage than Reality.", true],
     "hysteria2": ["Speed mode", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "Mobile networks, streaming, downloads, UDP-friendly routes", "QUIC-based. Often faster on weak or high-latency networks.", "Requires a domain certificate; selected by default and auto-configured when possible.", true],
     "trojan-tls": ["Compatibility", "Trojan TLS", "4/5", "Almost every mainstream proxy client", "Friends, family, older clients, minimal troubleshooting", "Looks close to normal HTTPS and has excellent client support.", "Requires a domain and TLS certificate; selected by default and auto-configured when possible.", true],
     "clash": ["Clash routing", "Clash/Mihomo", "4/5", "Clash Verge, Mihomo Party, Stash", "Auto-test, precision routing, one subscription for supported clients", "Generates a Clash/Mihomo YAML profile with China direct, global proxy, ad reject, and auto-test groups.", "This is a client subscription profile and does not add a server inbound port.", false],
@@ -470,7 +472,7 @@ function setIPMode(enabled) {
 function applyProtocolAvailability() {
   const ipMode = $("#ipDirect")?.checked;
   document.querySelectorAll("input[name=proto]").forEach(x => {
-    const directOnly = x.value === "vless-reality";
+    const directOnly = x.value === "vless-reality" || x.value === "shadowsocks";
     x.disabled = ipMode && !directOnly;
     x.checked = ipMode ? directOnly : profile(x.value).enabled;
     const card = x.closest(".protocolOption");
@@ -742,7 +744,7 @@ function renderProtocolLibrary() {
     <div class="dialogHead"><div><h2>${t("protocolLibrary")}</h2><p>${t("setupHintText")}</p></div><button class="btn ghost" id="closeProtocols">${t("cancel")}</button></div>
     <div class="protocolGrid" style="margin-top:14px">${allProfiles().map(([id, p]) => {
       const exists = state.nodes.some(n => n.protocol === id);
-      const ready = id === "vless-reality" || id === "clash" || (!state.ip_direct && state.cert_ready);
+      const ready = id === "vless-reality" || id === "shadowsocks" || id === "clash" || (!state.ip_direct && state.cert_ready);
       return `<div class="protocolOption ${exists ? "exists" : ""}">
         <span></span><span class="optionBody">
           <span class="optionTop"><strong>${p.title}</strong><em class="starBadge">${stars(p.score)}</em></span>

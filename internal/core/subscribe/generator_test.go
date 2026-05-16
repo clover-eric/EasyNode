@@ -19,6 +19,13 @@ func TestClashIncludesRoutingAndProxyGroups(t *testing.T) {
 			RealityShortID:   "abcd",
 		},
 		{
+			Protocol: "shadowsocks",
+			Status:   "running",
+			Host:     "example.com",
+			Port:     8388,
+			Password: "secret",
+		},
+		{
 			Protocol: "hysteria2",
 			Status:   "stopped",
 			Host:     "example.com",
@@ -40,6 +47,9 @@ func TestClashIncludesRoutingAndProxyGroups(t *testing.T) {
 		`DOMAIN-SUFFIX,youtube.com,Global`,
 		`DOMAIN-SUFFIX,googlevideo.com,Global`,
 		`GEOIP,cn,China,no-resolve`,
+		`name: "EasyNode shadowsocks"`,
+		`type: "ss"`,
+		`cipher: "chacha20-ietf-poly1305"`,
 		`name: "EasyNode vless-reality"`,
 		`type: "vless"`,
 		`skip-cert-verify: false`,
@@ -55,6 +65,18 @@ func TestClashIncludesRoutingAndProxyGroups(t *testing.T) {
 	}
 	if strings.Contains(yaml, "GEOSITE") || strings.Contains(yaml, "geox-url") {
 		t.Fatalf("clash yaml should avoid remote geodata dependency:\n%s", yaml)
+	}
+}
+
+func TestShadowsocksLink(t *testing.T) {
+	link := Link(model.Node{
+		Protocol: "shadowsocks",
+		Host:     "example.com",
+		Port:     8388,
+		Password: "secret",
+	})
+	if !strings.HasPrefix(link, "ss://") || !strings.Contains(link, "@example.com:8388") {
+		t.Fatalf("unexpected shadowsocks link: %s", link)
 	}
 }
 
