@@ -1405,6 +1405,9 @@ func newNodeFromRecommendation(rec model.Recommendation, host string, certReady 
 		n.RealityPublicKey = m.PublicKey
 		n.RealityShortID = m.ShortID
 	}
+	if n.Protocol == "vless-reality" && (n.RealityPrivateKey == "" || n.RealityPublicKey == "") {
+		n.Status = "stopped"
+	}
 	if !protocolRunnable(n.Protocol, certReady) {
 		n.Status = "stopped"
 	}
@@ -1448,10 +1451,20 @@ func (s *Server) ensureRunnableNodes() error {
 			if n.Protocol == "vless-reality" {
 				if n.RealityPrivateKey == "" || n.RealityPublicKey == "" || n.RealityShortID == "" {
 					m := singbox.GenerateRealityMaterial()
-					n.RealityPrivateKey = m.PrivateKey
-					n.RealityPublicKey = m.PublicKey
-					n.RealityShortID = m.ShortID
-					changed = true
+					if m.PrivateKey != "" && m.PublicKey != "" {
+						n.RealityPrivateKey = m.PrivateKey
+						n.RealityPublicKey = m.PublicKey
+						n.RealityShortID = m.ShortID
+						changed = true
+					}
+				}
+				if n.RealityPrivateKey == "" || n.RealityPublicKey == "" {
+					if n.Status == "running" {
+						changed = true
+					}
+					n.Status = "stopped"
+					n.SubscribeLink = ""
+					continue
 				}
 				n.Status = "running"
 				n.SubscribeLink = subscribe.Link(*n)

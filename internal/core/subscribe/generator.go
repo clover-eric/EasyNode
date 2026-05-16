@@ -12,7 +12,7 @@ import (
 
 func Link(n model.Node) string {
 	if n.Protocol == "clash" {
-		return n.SubscribeLink
+		return ""
 	}
 	host := n.Host
 	if host == "" {
@@ -38,8 +38,11 @@ func Link(n model.Node) string {
 func V2rayN(nodes []model.Node) string {
 	var links []string
 	for _, n := range nodes {
-		if n.Status == "running" {
-			links = append(links, Link(n))
+		if n.Status != "running" {
+			continue
+		}
+		if link := Link(n); link != "" {
+			links = append(links, link)
 		}
 	}
 	return base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))
@@ -48,12 +51,14 @@ func V2rayN(nodes []model.Node) string {
 func Clash(nodes []model.Node) string {
 	proxies := clashProxies(nodes)
 	if len(proxies) == 0 {
-		return "proxies: []\nproxy-groups: []\nrules:\n  - MATCH,DIRECT\n"
+		return "mixed-port: 7890\nallow-lan: true\nmode: rule\nlog-level: warning\nproxies: []\nproxy-groups: []\nrules:\n  - MATCH,DIRECT\n"
 	}
+
 	names := make([]string, 0, len(proxies))
 	for _, p := range proxies {
 		names = append(names, p.name)
 	}
+
 	var b strings.Builder
 	b.WriteString("mixed-port: 7890\n")
 	b.WriteString("allow-lan: true\n")
@@ -74,24 +79,24 @@ func Clash(nodes []model.Node) string {
 		b.WriteString(p.yaml)
 	}
 	b.WriteString("proxy-groups:\n")
-	writeClashGroup(&b, "🚀 节点选择", "select", append([]string{"♻️ 自动选择", "🔁 故障转移"}, append(names, "DIRECT")...), "")
-	writeClashGroup(&b, "♻️ 自动选择", "url-test", names, "    url: http://www.gstatic.com/generate_204\n    interval: 300\n    tolerance: 50\n    lazy: true\n")
-	writeClashGroup(&b, "🔁 故障转移", "fallback", names, "    url: http://www.gstatic.com/generate_204\n    interval: 300\n    lazy: true\n")
-	writeClashGroup(&b, "🌍 国外流量", "select", []string{"🚀 节点选择", "♻️ 自动选择", "🔁 故障转移"}, "")
-	writeClashGroup(&b, "🇨🇳 国内直连", "select", append([]string{"DIRECT"}, names...), "")
+	writeClashGroup(&b, "Proxy", "select", append([]string{"Auto", "Fallback"}, append(names, "DIRECT")...), "")
+	writeClashGroup(&b, "Auto", "url-test", names, "    url: http://www.gstatic.com/generate_204\n    interval: 300\n    tolerance: 50\n    lazy: true\n")
+	writeClashGroup(&b, "Fallback", "fallback", names, "    url: http://www.gstatic.com/generate_204\n    interval: 300\n    lazy: true\n")
+	writeClashGroup(&b, "Global", "select", []string{"Proxy", "Auto", "Fallback"}, "")
+	writeClashGroup(&b, "China", "select", append([]string{"DIRECT"}, names...), "")
 	b.WriteString("rules:\n")
 	b.WriteString("  - GEOSITE,private,DIRECT\n")
 	b.WriteString("  - GEOIP,private,DIRECT,no-resolve\n")
 	b.WriteString("  - GEOSITE,category-ads-all,REJECT\n")
-	b.WriteString("  - GEOSITE,apple-cn,🇨🇳 国内直连\n")
-	b.WriteString("  - GEOSITE,google,🌍 国外流量\n")
-	b.WriteString("  - GEOSITE,telegram,🌍 国外流量\n")
-	b.WriteString("  - GEOSITE,youtube,🌍 国外流量\n")
-	b.WriteString("  - GEOSITE,netflix,🌍 国外流量\n")
-	b.WriteString("  - GEOSITE,geolocation-!cn,🌍 国外流量\n")
-	b.WriteString("  - GEOSITE,cn,🇨🇳 国内直连\n")
-	b.WriteString("  - GEOIP,cn,🇨🇳 国内直连,no-resolve\n")
-	b.WriteString("  - MATCH,🚀 节点选择\n")
+	b.WriteString("  - GEOSITE,apple-cn,China\n")
+	b.WriteString("  - GEOSITE,google,Global\n")
+	b.WriteString("  - GEOSITE,telegram,Global\n")
+	b.WriteString("  - GEOSITE,youtube,Global\n")
+	b.WriteString("  - GEOSITE,netflix,Global\n")
+	b.WriteString("  - GEOSITE,geolocation-!cn,Global\n")
+	b.WriteString("  - GEOSITE,cn,China\n")
+	b.WriteString("  - GEOIP,cn,China,no-resolve\n")
+	b.WriteString("  - MATCH,Proxy\n")
 	return b.String()
 }
 
@@ -104,6 +109,9 @@ func clashProxies(nodes []model.Node) []clashProxy {
 	out := []clashProxy{}
 	for _, n := range nodes {
 		if n.Status != "running" || n.Protocol == "clash" {
+			continue
+		}
+		if n.Protocol == "vless-reality" && n.RealityPublicKey == "" {
 			continue
 		}
 		if p, ok := clashProxyForNode(n); ok {
@@ -135,6 +143,7 @@ func clashProxyForNode(n model.Node) (clashProxy, bool) {
 		writeClashKV(&b, "flow", "xtls-rprx-vision")
 		writeClashKV(&b, "servername", "www.microsoft.com")
 		writeClashKV(&b, "client-fingerprint", "chrome")
+		writeClashKV(&b, "skip-cert-verify", "false")
 		b.WriteString("    reality-opts:\n")
 		writeClashNestedKV(&b, "public-key", n.RealityPublicKey)
 		writeClashNestedKV(&b, "short-id", n.RealityShortID)
@@ -145,12 +154,14 @@ func clashProxyForNode(n model.Node) (clashProxy, bool) {
 		writeClashKV(&b, "password", n.Password)
 		writeClashKV(&b, "sni", host)
 		writeClashKV(&b, "udp", "true")
+		writeClashKV(&b, "skip-cert-verify", "false")
 	case "hysteria2":
 		writeClashKV(&b, "type", "hysteria2")
 		writeClashKV(&b, "server", host)
 		writeClashInt(&b, "port", n.Port)
 		writeClashKV(&b, "password", n.Password)
 		writeClashKV(&b, "sni", host)
+		writeClashKV(&b, "skip-cert-verify", "false")
 	case "vless-ws-tls":
 		writeClashKV(&b, "type", "vless")
 		writeClashKV(&b, "server", host)
@@ -160,6 +171,7 @@ func clashProxyForNode(n model.Node) (clashProxy, bool) {
 		writeClashKV(&b, "tls", "true")
 		writeClashKV(&b, "udp", "true")
 		writeClashKV(&b, "servername", host)
+		writeClashKV(&b, "skip-cert-verify", "false")
 		b.WriteString("    ws-opts:\n")
 		writeClashNestedKV(&b, "path", "/easynode")
 	case "tuic":
@@ -169,6 +181,7 @@ func clashProxyForNode(n model.Node) (clashProxy, bool) {
 		writeClashKV(&b, "uuid", n.UUID)
 		writeClashKV(&b, "password", n.Password)
 		writeClashKV(&b, "sni", host)
+		writeClashKV(&b, "skip-cert-verify", "false")
 		writeClashKV(&b, "congestion-controller", "bbr")
 	default:
 		return clashProxy{}, false
