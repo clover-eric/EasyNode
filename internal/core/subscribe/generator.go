@@ -11,6 +11,9 @@ import (
 )
 
 func Link(n model.Node) string {
+	if n.Protocol == "clash" {
+		return n.SubscribeLink
+	}
 	host := n.Host
 	if host == "" {
 		host = "127.0.0.1"
@@ -100,7 +103,7 @@ type clashProxy struct {
 func clashProxies(nodes []model.Node) []clashProxy {
 	out := []clashProxy{}
 	for _, n := range nodes {
-		if n.Status != "running" {
+		if n.Status != "running" || n.Protocol == "clash" {
 			continue
 		}
 		if p, ok := clashProxyForNode(n); ok {

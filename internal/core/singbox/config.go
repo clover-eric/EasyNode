@@ -70,6 +70,9 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, ce
 		if n.Status != "running" {
 			continue
 		}
+		if n.Protocol == "clash" {
+			continue
+		}
 		if n.Protocol != "vless-reality" && (certPath == "" || keyPath == "") {
 			continue
 		}

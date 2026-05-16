@@ -1393,7 +1393,7 @@ func nodesFromRecommendations(recs []model.Recommendation, selected []string, do
 }
 
 func newNodeFromRecommendation(rec model.Recommendation, host string, certReady bool) model.Node {
-	ports := map[string]int{"vless-reality": 443, "hysteria2": 8443, "trojan-tls": 2053, "vless-ws-tls": 2083, "tuic": 9443}
+	ports := map[string]int{"vless-reality": 443, "hysteria2": 8443, "trojan-tls": 2053, "vless-ws-tls": 2083, "tuic": 9443, "clash": 0}
 	n := model.Node{
 		ID: rec.Protocol, Protocol: rec.Protocol, Transport: rec.Transport, Security: rec.Security,
 		Label: rec.Label, Description: rec.Description, Priority: rec.Priority, Status: "running",
@@ -1415,7 +1415,7 @@ func newNodeFromRecommendation(rec model.Recommendation, host string, certReady 
 }
 
 func protocolRunnable(protocol string, certReady bool) bool {
-	if protocol == "vless-reality" {
+	if protocol == "vless-reality" || protocol == "clash" {
 		return true
 	}
 	switch protocol {

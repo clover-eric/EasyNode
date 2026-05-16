@@ -40,9 +40,7 @@ const copyText = {
     loginButton: "进入面板",
     nodes: "个节点",
     copySub: "复制订阅",
-    clashSub: "Clash 订阅",
     subQR: "订阅二维码",
-    clashQR: "Clash 二维码",
     settings: "设置",
     addProtocol: "添加协议",
     protocolLibrary: "协议库",
@@ -171,9 +169,7 @@ const copyText = {
     loginButton: "Open panel",
     nodes: "nodes",
     copySub: "Copy subscription",
-    clashSub: "Clash subscription",
     subQR: "Subscription QR",
-    clashQR: "Clash QR",
     settings: "Settings",
     addProtocol: "Add protocol",
     protocolLibrary: "Protocol library",
@@ -274,6 +270,7 @@ const profiles = {
     "vless-reality": ["日常首选", "VLESS Reality", "5/5", "v2rayN, Nekoray, Shadowrocket, sing-box", "网页、视频、聊天、长期稳定使用", "不需要域名证书，伪装能力强，默认建议开启。", "部分旧客户端不支持 Reality。", true],
     "hysteria2": ["高速传输", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "移动网络、跨境视频、下载、UDP 通畅线路", "基于 QUIC，弱网和高延迟线路上通常更快。", "需要域名证书；默认勾选，系统会自动尝试配置。", true],
     "trojan-tls": ["兼容优先", "Trojan TLS", "4/5", "几乎所有主流代理客户端", "给家人朋友用、旧客户端、追求少折腾", "形态接近普通 HTTPS，客户端兼容性最好。", "需要域名和 TLS 证书；默认勾选，系统会自动尝试配置。", true],
+    "clash": ["Clash 分流", "Clash/Mihomo", "4/5", "Clash Verge, Mihomo Party, Stash", "需要自动测速、精准分流、统一导入的客户端", "生成 Clash/Mihomo YAML 订阅，内置国内直连、国外代理、广告拦截和自动测速。", "这是客户端订阅配置，不会新增服务器入站端口。", false],
     "vless-ws-tls": ["CDN 线路", "VLESS WS TLS", "3/5", "v2rayN, Clash Meta, Shadowrocket", "套 Cloudflare/CDN、隐藏真实服务器 IP", "走 WebSocket + TLS，适合反代和 CDN 中转。", "速度通常不是最强，配置链路更长。", false],
     "tuic": ["备用加速", "TUIC v5", "3/5", "Nekoray, sing-box, 部分移动客户端", "UDP 可用时作为第二条 QUIC 备用线路", "现代 QUIC 协议，适合做补充节点。", "客户端覆盖率低于 Trojan 和 VLESS。", false]
   },
@@ -281,6 +278,7 @@ const profiles = {
     "vless-reality": ["Daily default", "VLESS Reality", "5/5", "v2rayN, Nekoray, Shadowrocket, sing-box", "Browsing, video, chat, long-term stable use", "No domain certificate required. Strong camouflage and best default choice.", "Some older clients do not support Reality.", true],
     "hysteria2": ["Speed mode", "Hysteria2", "5/5", "Nekoray, Shadowrocket, sing-box, Hiddify", "Mobile networks, streaming, downloads, UDP-friendly routes", "QUIC-based. Often faster on weak or high-latency networks.", "Requires a domain certificate; selected by default and auto-configured when possible.", true],
     "trojan-tls": ["Compatibility", "Trojan TLS", "4/5", "Almost every mainstream proxy client", "Friends, family, older clients, minimal troubleshooting", "Looks close to normal HTTPS and has excellent client support.", "Requires a domain and TLS certificate; selected by default and auto-configured when possible.", true],
+    "clash": ["Clash routing", "Clash/Mihomo", "4/5", "Clash Verge, Mihomo Party, Stash", "Auto-test, precision routing, one subscription for supported clients", "Generates a Clash/Mihomo YAML profile with China direct, global proxy, ad reject, and auto-test groups.", "This is a client subscription profile and does not add a server inbound port.", false],
     "vless-ws-tls": ["CDN route", "VLESS WS TLS", "3/5", "v2rayN, Clash Meta, Shadowrocket", "Cloudflare/CDN, reverse proxy, hiding origin IP", "WebSocket over TLS, useful behind CDN or reverse proxy.", "Usually not the fastest and has a longer config chain.", false],
     "tuic": ["Backup boost", "TUIC v5", "3/5", "Nekoray, sing-box, selected mobile clients", "A second QUIC route when UDP works well", "Modern QUIC protocol, useful as a backup node.", "Client coverage is lower than Trojan and VLESS.", false]
   }
@@ -575,7 +573,6 @@ function esc(s) {
 
 function renderDashboard() {
   const sub = `${location.origin}/api/v1/subscribe/${state.subscribe_key}`;
-  const clashSub = `${sub}/clash`;
   const runningCount = state.nodes.filter(n => n.status === "running").length;
   app.innerHTML = `<main class="shell">
     <header class="top dashboardTop">
@@ -584,7 +581,7 @@ function renderDashboard() {
         <div class="topMeta"><span>${runningCount}/${state.nodes.length} ${t("running")}</span><span>${t("panelPath")} ${state.panel_path}</span></div>
       </div>
       <div class="actionPanel">
-        <div class="actionGroup primaryGroup"><button class="btn primary" id="copySub">${t("copySub")}</button><button class="btn" id="copyClash">${t("clashSub")}</button><button class="btn" id="subQR">${t("subQR")}</button><button class="btn" id="clashQR">${t("clashQR")}</button></div>
+        <div class="actionGroup primaryGroup"><button class="btn primary" id="copySub">${t("copySub")}</button><button class="btn" id="subQR">${t("subQR")}</button></div>
         <div class="actionGroup"><button class="btn" id="purityBtn">${t("ipPurity")}</button><button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button></div>
         <div class="actionGroup subtleGroup">${langButton()}<button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
       </div>
@@ -600,9 +597,7 @@ function renderDashboard() {
   $("#protocolsBtn").onclick = renderProtocolLibrary;
   $("#settingsBtn").onclick = renderSettings;
   $("#copySub").onclick = () => copy(sub, $("#copySub"));
-  $("#copyClash").onclick = () => copy(clashSub, $("#copyClash"));
   $("#subQR").onclick = () => showQR(sub, t("subQR"), "/api/v1/qrcode/subscribe");
-  $("#clashQR").onclick = () => showQR(clashSub, t("clashQR"), "/api/v1/qrcode/clash");
   $("#downloadCfg").onclick = showSingBoxConfig;
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
   $("#togglePairing").onclick = async () => {
@@ -674,11 +669,11 @@ function renderDashboard() {
   });
   document.querySelectorAll("[data-node-copy]").forEach(b => b.onclick = () => {
     const n = state.nodes.find(x => x.id === b.dataset.nodeCopy);
-    copy(n?.subscribe_link || "", b);
+    copy(nodeLink(n), b);
   });
   document.querySelectorAll("[data-node-qr]").forEach(b => b.onclick = () => {
     const n = state.nodes.find(x => x.id === b.dataset.nodeQr);
-    showQR(n?.subscribe_link || "", n ? protocolName(n.protocol) : "", n ? `/api/v1/qrcode/node/${encodeURIComponent(n.id)}` : "");
+    showQR(nodeLink(n), n ? protocolName(n.protocol) : "", n?.protocol === "clash" ? "/api/v1/qrcode/clash" : (n ? `/api/v1/qrcode/node/${encodeURIComponent(n.id)}` : ""));
   });
   document.querySelectorAll("[data-node-shadowrocket]").forEach(b => b.onclick = async () => {
     const n = state.nodes.find(x => x.id === b.dataset.nodeShadowrocket);
@@ -747,7 +742,7 @@ function renderProtocolLibrary() {
     <div class="dialogHead"><div><h2>${t("protocolLibrary")}</h2><p>${t("setupHintText")}</p></div><button class="btn ghost" id="closeProtocols">${t("cancel")}</button></div>
     <div class="protocolGrid" style="margin-top:14px">${allProfiles().map(([id, p]) => {
       const exists = state.nodes.some(n => n.protocol === id);
-      const ready = id === "vless-reality" || (!state.ip_direct && state.cert_ready);
+      const ready = id === "vless-reality" || id === "clash" || (!state.ip_direct && state.cert_ready);
       return `<div class="protocolOption ${exists ? "exists" : ""}">
         <span></span><span class="optionBody">
           <span class="optionTop"><strong>${p.title}</strong><em class="starBadge">${stars(p.score)}</em></span>
@@ -1006,7 +1001,10 @@ function locationSourcesHTML(sources) {
 
 function nodeCard(n) {
   const p = profile(n.protocol);
-  const canCopy = n.status === "running" && n.subscribe_link;
+  const link = nodeLink(n);
+  const canCopy = n.status === "running" && link;
+  const portLabel = n.protocol === "clash" ? "SUB" : n.port;
+  const portText = n.protocol === "clash" ? "订阅" : t("port");
   const copyButton = canCopy
     ? `<button class="btn" data-node-copy="${n.id}">${t("copyLink")}</button>`
     : `<button class="btn" disabled title="${t("certRequired")}">${t("unavailable")}</button>`;
@@ -1016,7 +1014,7 @@ function nodeCard(n) {
     <div class="cardHead"><div class="status"><i class="dot"></i>${n.status === "running" ? t("running") : t("stopped")}</div><span class="badge starBadge">${stars(p.score)}</span></div>
     <div class="proto">${p.title}</div><p class="desc">${p.summary}</p>
     <div class="miniInfo">${p.protocol} · ${p.clients || t("mainstreamClients")}</div>
-    <div class="stats"><div class="stat"><b>${n.latency_ms ? `${n.latency_ms}ms` : "-"}</b><span>${t("mainlandLatency")}</span></div><div class="stat"><b>${n.port}</b><span>${t("port")}</span></div><div class="stat"><b>${formatBytes(n.traffic_used || 0)}</b><span>${t("traffic")}</span></div></div>
+    <div class="stats"><div class="stat"><b>${n.latency_ms ? `${n.latency_ms}ms` : "-"}</b><span>${t("mainlandLatency")}</span></div><div class="stat"><b>${portLabel}</b><span>${portText}</span></div><div class="stat"><b>${formatBytes(n.traffic_used || 0)}</b><span>${t("traffic")}</span></div></div>
     <div class="row">${copyButton}${qrButton}${shadowrocketButton}<button class="btn" data-toggle="${n.id}">${n.status === "running" ? t("stop") : t("start")}</button></div>
   </article>`;
 }
@@ -1031,6 +1029,12 @@ function formatBytes(bytes) {
     i++;
   }
   return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)}${units[i]}`;
+}
+
+function nodeLink(n) {
+  if (!n) return "";
+  if (n.protocol === "clash") return `${location.origin}/api/v1/subscribe/${state.subscribe_key}/clash`;
+  return n.subscribe_link || "";
 }
 
 async function showPurity() {
@@ -1179,3 +1183,4 @@ registerPWA();
 boot(true).catch(e => {
   app.innerHTML = `<main class="shell"><section class="panel"><h1>EasyNode</h1><p>${e.message}</p></section></main>`;
 });
+
