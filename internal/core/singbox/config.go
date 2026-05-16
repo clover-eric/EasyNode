@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"net/url"
 	"os"
@@ -152,6 +153,18 @@ func RestartService() error {
 	return exec.Command("systemctl", "restart", "easynode-singbox").Run()
 }
 
+func ValidateConfig(path string) error {
+	singBox, err := exec.LookPath("sing-box")
+	if err != nil {
+		return nil
+	}
+	out, err := exec.Command(singBox, "check", "-c", path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("sing-box config invalid: %s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, certPath, keyPath string) (string, error) {
 	cfg := map[string]any{
 		"log":      map[string]any{"level": "info"},
@@ -198,7 +211,15 @@ func WriteConfig(dataDir string, nodes []model.Node, peers []model.ChainPeer, ce
 		return "", err
 	}
 	path := filepath.Join(dataDir, "sing-box.json")
-	return path, os.WriteFile(path, b, 0600)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0600); err != nil {
+		return "", err
+	}
+	if err := ValidateConfig(tmp); err != nil {
+		_ = os.Remove(tmp)
+		return "", err
+	}
+	return path, os.Rename(tmp, path)
 }
 
 func chainOutbound(peer model.ChainPeer) map[string]any {

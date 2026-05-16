@@ -7,7 +7,8 @@ type AppState struct {
 	PanelPath            string        `json:"panel_path"`
 	AdminPassword        string        `json:"-"`
 	AdminPasswordHash    string        `json:"admin_password_hash,omitempty"`
-	SessionToken         string        `json:"session_token,omitempty"`
+	SessionToken         string        `json:"-"`
+	SessionTokenHash     string        `json:"session_token_hash,omitempty"`
 	LoginFailures        int           `json:"login_failures,omitempty"`
 	LockoutUntil         time.Time     `json:"lockout_until,omitempty"`
 	Domain               string        `json:"domain"`
@@ -21,7 +22,14 @@ type AppState struct {
 	ChainClients         []ChainClient `json:"chain_clients,omitempty"`
 	ChainPairingDisabled bool          `json:"chain_pairing_disabled,omitempty"`
 	PairingCodes         []PairingCode `json:"pairing_codes,omitempty"`
+	TrafficHistory       []TrafficSnap `json:"traffic_history,omitempty"`
 	UpdatedAt            time.Time     `json:"updated_at"`
+}
+
+type TrafficSnap struct {
+	Port      int       `json:"port"`
+	Bytes     int64     `json:"bytes"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type Node struct {

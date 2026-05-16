@@ -52,6 +52,26 @@ func TestWriteConfigIncludesShadowsocksInboundWithoutCert(t *testing.T) {
 	}
 }
 
+func TestWriteConfigAtomicNoLeftoverTmp(t *testing.T) {
+	dir := t.TempDir()
+	_, err := WriteConfig(dir, []model.Node{{
+		ID:       "shadowsocks",
+		Protocol: "shadowsocks",
+		Status:   "running",
+		Port:     8388,
+		Password: "secret",
+	}}, nil, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Fatalf("leftover tmp file: %s", e.Name())
+		}
+	}
+}
+
 func TestX25519Vector(t *testing.T) {
 	private, _ := hex.DecodeString("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4")
 	point, _ := hex.DecodeString("e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d1ab1c4c")

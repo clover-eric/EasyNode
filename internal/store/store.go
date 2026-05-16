@@ -36,8 +36,8 @@ func Open(dataDir string) (*Store, error) {
 			s.state.SubscribeKey = util.Token(16)
 			changed = true
 		}
-		if s.state.SessionToken == "" {
-			s.state.SessionToken = util.Token(24)
+		if s.state.SessionTokenHash == "" {
+			s.state.SessionTokenHash = util.SHA256Hex(util.Token(24))
 			changed = true
 		}
 		if changed {
@@ -47,10 +47,10 @@ func Open(dataDir string) (*Store, error) {
 		}
 	} else if errors.Is(err, os.ErrNotExist) {
 		s.state = model.AppState{
-			PanelPath:    "/panel-" + util.Token(3),
-			SubscribeKey: util.Token(16),
-			SessionToken: util.Token(24),
-			UpdatedAt:    time.Now(),
+			PanelPath:        "/panel-" + util.Token(3),
+			SubscribeKey:     util.Token(16),
+			SessionTokenHash: util.SHA256Hex(util.Token(24)),
+			UpdatedAt:        time.Now(),
 		}
 		if err := s.saveLocked(); err != nil {
 			return nil, err
