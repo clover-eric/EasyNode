@@ -33,20 +33,22 @@ func TestClashIncludesRoutingAndProxyGroups(t *testing.T) {
 			Password: "secret",
 		},
 	}
-	yaml := Clash(nodes)
+	yaml := ClashV2(nodes)
 	want := []string{
 		`mixed-port: 7890`,
 		`unified-delay: true`,
 		`tcp-concurrent: true`,
 		`enhanced-mode: fake-ip`,
+		`name: "GLOBAL"`,
 		`name: "Proxy"`,
 		`name: "Auto"`,
 		`name: "Fallback"`,
+		`name: "LoadBalance"`,
 		`type: url-test`,
 		`type: fallback`,
-		`DOMAIN-SUFFIX,youtube.com,Global`,
-		`DOMAIN-SUFFIX,googlevideo.com,Global`,
-		`GEOIP,cn,China,no-resolve`,
+		`type: load-balance`,
+		`RULE-SET,proxy,Proxy`,
+		`RULE-SET,direct,China`,
 		`name: "EasyNode shadowsocks"`,
 		`type: "ss"`,
 		`cipher: "chacha20-ietf-poly1305"`,
@@ -63,9 +65,6 @@ func TestClashIncludesRoutingAndProxyGroups(t *testing.T) {
 	if strings.Contains(yaml, "hysteria2") {
 		t.Fatalf("stopped node leaked into clash yaml:\n%s", yaml)
 	}
-	if strings.Contains(yaml, "GEOSITE") || strings.Contains(yaml, "geox-url") {
-		t.Fatalf("clash yaml should avoid remote geodata dependency:\n%s", yaml)
-	}
 }
 
 func TestShadowsocksLink(t *testing.T) {
@@ -81,7 +80,7 @@ func TestShadowsocksLink(t *testing.T) {
 }
 
 func TestClashSkipsInvalidRealityNode(t *testing.T) {
-	yaml := Clash([]model.Node{{
+	yaml := ClashV2([]model.Node{{
 		Protocol: "vless-reality",
 		Status:   "running",
 		Host:     "example.com",

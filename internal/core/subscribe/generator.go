@@ -51,66 +51,6 @@ func V2rayN(nodes []model.Node) string {
 	return base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))
 }
 
-func Clash(nodes []model.Node) string {
-	proxies := clashProxies(nodes)
-	if len(proxies) == 0 {
-		return "mixed-port: 7890\nallow-lan: true\nmode: rule\nlog-level: warning\nproxies: []\nproxy-groups: []\nrules:\n  - MATCH,DIRECT\n"
-	}
-
-	names := make([]string, 0, len(proxies))
-	for _, p := range proxies {
-		names = append(names, p.name)
-	}
-
-	var b strings.Builder
-	b.WriteString("mixed-port: 7890\n")
-	b.WriteString("allow-lan: true\n")
-	b.WriteString("mode: rule\n")
-	b.WriteString("log-level: warning\n")
-	b.WriteString("ipv6: true\n")
-	b.WriteString("unified-delay: true\n")
-	b.WriteString("tcp-concurrent: true\n")
-	b.WriteString("find-process-mode: strict\n")
-	b.WriteString("global-client-fingerprint: chrome\n")
-	b.WriteString("profile:\n  store-selected: true\n  store-fake-ip: true\n")
-	b.WriteString("sniffer:\n  enable: true\n  sniff:\n    TLS:\n      ports: [443, 8443]\n    HTTP:\n      ports: [80, 8080-8880]\n      override-destination: true\n")
-	b.WriteString("dns:\n  enable: true\n  listen: 0.0.0.0:1053\n  ipv6: true\n  enhanced-mode: fake-ip\n  fake-ip-range: 198.18.0.1/16\n  fake-ip-filter:\n    - '*.lan'\n    - '*.local'\n    - 'localhost.ptlogin2.qq.com'\n  default-nameserver:\n    - 223.5.5.5\n    - 119.29.29.29\n  nameserver:\n    - https://223.5.5.5/dns-query\n    - https://doh.pub/dns-query\n  fallback:\n    - https://1.1.1.1/dns-query\n    - https://8.8.8.8/dns-query\n  fallback-filter:\n    geoip: true\n    geoip-code: CN\n")
-	b.WriteString("proxies:\n")
-	for _, p := range proxies {
-		b.WriteString(p.yaml)
-	}
-	b.WriteString("proxy-groups:\n")
-	writeClashGroup(&b, "Proxy", "select", append([]string{"Auto", "Fallback"}, append(names, "DIRECT")...), "")
-	writeClashGroup(&b, "Auto", "url-test", names, "    url: http://www.gstatic.com/generate_204\n    interval: 300\n    tolerance: 50\n    lazy: true\n")
-	writeClashGroup(&b, "Fallback", "fallback", names, "    url: http://www.gstatic.com/generate_204\n    interval: 300\n    lazy: true\n")
-	writeClashGroup(&b, "Global", "select", []string{"Proxy", "Auto", "Fallback"}, "")
-	writeClashGroup(&b, "China", "select", append([]string{"DIRECT"}, names...), "")
-	b.WriteString("rules:\n")
-	b.WriteString("  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve\n")
-	b.WriteString("  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve\n")
-	b.WriteString("  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve\n")
-	b.WriteString("  - GEOIP,private,DIRECT,no-resolve\n")
-	b.WriteString("  - DOMAIN-SUFFIX,google.com,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,googleapis.com,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,gstatic.com,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,youtube.com,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,ytimg.com,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,googlevideo.com,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,telegram.org,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,t.me,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,netflix.com,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,nflxvideo.net,Global\n")
-	b.WriteString("  - DOMAIN-SUFFIX,cn,China\n")
-	b.WriteString("  - DOMAIN-SUFFIX,qq.com,China\n")
-	b.WriteString("  - DOMAIN-SUFFIX,taobao.com,China\n")
-	b.WriteString("  - DOMAIN-SUFFIX,alipay.com,China\n")
-	b.WriteString("  - DOMAIN-SUFFIX,baidu.com,China\n")
-	b.WriteString("  - DOMAIN-SUFFIX,bilibili.com,China\n")
-	b.WriteString("  - GEOIP,cn,China,no-resolve\n")
-	b.WriteString("  - MATCH,Proxy\n")
-	return b.String()
-}
-
 type clashProxy struct {
 	name string
 	yaml string

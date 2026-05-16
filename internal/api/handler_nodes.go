@@ -49,14 +49,6 @@ func (s *Server) AddNode(w http.ResponseWriter, r *http.Request) {
 		host := configuredHost(st.Domain, st.IPDirect, r)
 		node := newNodeFromRecommendation(*rec, host, st.CertReady)
 		st.Nodes = append(st.Nodes, node)
-		if req.Protocol == "clash" && !hasProtocol(st.Nodes, "shadowsocks") {
-			for _, dep := range recs {
-				if dep.Protocol == "shadowsocks" {
-					st.Nodes = append(st.Nodes, newNodeFromRecommendation(dep, host, st.CertReady))
-					break
-				}
-			}
-		}
 		return nil
 	})
 	if err != nil {
