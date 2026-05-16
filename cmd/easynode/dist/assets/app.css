@@ -114,3 +114,19 @@ textarea{font:inherit}
   .row .btn{min-width:100%}
   .stats{grid-template-columns:1fr}
 }
+@supports(padding-top:min(1px,2px)){
+  @media(max-width:680px){
+    .shell{padding-top:min(calc(env(safe-area-inset-top,0px) + 8px),28px)!important}
+    .bootShell{padding-top:min(calc(env(safe-area-inset-top,0px) + 8px),28px)!important}
+  }
+  @media(display-mode:standalone) and (max-width:680px){
+    .shell{padding-top:min(calc(env(safe-area-inset-top,0px) + 10px),34px)!important}
+    .bootShell{padding-top:min(calc(env(safe-area-inset-top,0px) + 10px),34px)!important}
+  }
+}
+@supports not (padding-top:min(1px,2px)){
+  @media(max-width:680px){
+    .shell{padding-top:18px!important}
+    .bootShell{padding-top:18px!important}
+  }
+}
