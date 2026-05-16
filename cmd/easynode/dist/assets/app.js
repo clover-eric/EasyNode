@@ -40,7 +40,9 @@ const copyText = {
     loginButton: "进入面板",
     nodes: "个节点",
     copySub: "复制订阅",
+    clashSub: "Clash 订阅",
     subQR: "订阅二维码",
+    clashQR: "Clash 二维码",
     settings: "设置",
     addProtocol: "添加协议",
     protocolLibrary: "协议库",
@@ -169,7 +171,9 @@ const copyText = {
     loginButton: "Open panel",
     nodes: "nodes",
     copySub: "Copy subscription",
+    clashSub: "Clash subscription",
     subQR: "Subscription QR",
+    clashQR: "Clash QR",
     settings: "Settings",
     addProtocol: "Add protocol",
     protocolLibrary: "Protocol library",
@@ -571,6 +575,7 @@ function esc(s) {
 
 function renderDashboard() {
   const sub = `${location.origin}/api/v1/subscribe/${state.subscribe_key}`;
+  const clashSub = `${sub}/clash`;
   const runningCount = state.nodes.filter(n => n.status === "running").length;
   app.innerHTML = `<main class="shell">
     <header class="top dashboardTop">
@@ -579,7 +584,7 @@ function renderDashboard() {
         <div class="topMeta"><span>${runningCount}/${state.nodes.length} ${t("running")}</span><span>${t("panelPath")} ${state.panel_path}</span></div>
       </div>
       <div class="actionPanel">
-        <div class="actionGroup primaryGroup"><button class="btn primary" id="copySub">${t("copySub")}</button><button class="btn" id="subQR">${t("subQR")}</button></div>
+        <div class="actionGroup primaryGroup"><button class="btn primary" id="copySub">${t("copySub")}</button><button class="btn" id="copyClash">${t("clashSub")}</button><button class="btn" id="subQR">${t("subQR")}</button><button class="btn" id="clashQR">${t("clashQR")}</button></div>
         <div class="actionGroup"><button class="btn" id="purityBtn">${t("ipPurity")}</button><button class="btn" id="protocolsBtn">${t("addProtocol")}</button><button class="btn" id="settingsBtn">${t("settings")}</button></div>
         <div class="actionGroup subtleGroup">${langButton()}<button class="btn" id="downloadCfg">${t("config")}</button><button class="btn ghost" id="logout">${t("logout")}</button></div>
       </div>
@@ -595,7 +600,9 @@ function renderDashboard() {
   $("#protocolsBtn").onclick = renderProtocolLibrary;
   $("#settingsBtn").onclick = renderSettings;
   $("#copySub").onclick = () => copy(sub, $("#copySub"));
+  $("#copyClash").onclick = () => copy(clashSub, $("#copyClash"));
   $("#subQR").onclick = () => showQR(sub, t("subQR"), "/api/v1/qrcode/subscribe");
+  $("#clashQR").onclick = () => showQR(clashSub, t("clashQR"), "/api/v1/qrcode/clash");
   $("#downloadCfg").onclick = showSingBoxConfig;
   $("#logout").onclick = async () => { await api("/api/v1/logout", { method: "POST" }); renderLogin(); };
   $("#togglePairing").onclick = async () => {

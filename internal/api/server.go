@@ -84,6 +84,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/v1/system/upgrade/status", s.auth(s.UpgradeStatus))
 	s.mux.HandleFunc("/api/v1/system/update-info", s.auth(s.UpdateInfo))
 	s.mux.HandleFunc("/api/v1/qrcode/subscribe", s.auth(s.SubscribeQRCode))
+	s.mux.HandleFunc("/api/v1/qrcode/clash", s.auth(s.ClashQRCode))
 	s.mux.HandleFunc("/api/v1/qrcode/node/", s.auth(s.NodeQRCode))
 	s.mux.HandleFunc("/api/v1/chain/public/status", s.ChainPublicStatus)
 	s.mux.HandleFunc("/api/v1/chain/public/paired", s.ChainPublicPaired)
@@ -874,9 +875,20 @@ func (s *Server) NodeAction(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Subscribe(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, "/api/v1/subscribe/")
+	format := ""
+	if strings.HasSuffix(key, "/clash") {
+		key = strings.TrimSuffix(key, "/clash")
+		format = "clash"
+	}
 	st := s.store.Snapshot()
 	if key != st.SubscribeKey {
 		http.NotFound(w, r)
+		return
+	}
+	if format == "clash" || strings.EqualFold(r.URL.Query().Get("format"), "clash") || strings.EqualFold(r.URL.Query().Get("target"), "clash") {
+		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		w.Header().Set("Content-Disposition", `inline; filename="easynode-clash.yaml"`)
+		_, _ = w.Write([]byte(subscribe.Clash(st.Nodes)))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -889,6 +901,19 @@ func (s *Server) SubscribeQRCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st := s.store.Snapshot()
+	writeQRCode(w, publicBaseURL(r)+"/api/v1/subscribe/"+st.SubscribeKey)
+}
+
+func (s *Server) ClashQRCode(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		method(w)
+		return
+	}
+	st := s.store.Snapshot()
+	writeQRCode(w, publicBaseURL(r)+"/api/v1/subscribe/"+st.SubscribeKey+"/clash")
+}
+
+func publicBaseURL(r *http.Request) string {
 	scheme := "http"
 	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 		scheme = "https"
@@ -897,7 +922,7 @@ func (s *Server) SubscribeQRCode(w http.ResponseWriter, r *http.Request) {
 	if forwardedHost := strings.TrimSpace(r.Header.Get("X-Forwarded-Host")); forwardedHost != "" {
 		host = forwardedHost
 	}
-	writeQRCode(w, scheme+"://"+host+"/api/v1/subscribe/"+st.SubscribeKey)
+	return scheme + "://" + host
 }
 
 func (s *Server) NodeQRCode(w http.ResponseWriter, r *http.Request) {
