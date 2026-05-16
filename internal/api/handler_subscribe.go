@@ -27,7 +27,7 @@ func (s *Server) Subscribe(w http.ResponseWriter, r *http.Request) {
 	if format == "clash" || strings.EqualFold(r.URL.Query().Get("format"), "clash") || strings.EqualFold(r.URL.Query().Get("target"), "clash") {
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		w.Header().Set("Content-Disposition", `inline; filename="easynode-clash.yaml"`)
-		_, _ = w.Write([]byte(subscribe.Clash(nodes)))
+		_, _ = w.Write([]byte(subscribe.ClashV2(nodes)))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
