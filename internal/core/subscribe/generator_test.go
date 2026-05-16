@@ -37,7 +37,8 @@ func TestClashIncludesRoutingAndProxyGroups(t *testing.T) {
 		`name: "Fallback"`,
 		`type: url-test`,
 		`type: fallback`,
-		`GEOSITE,geolocation-!cn,Global`,
+		`DOMAIN-SUFFIX,youtube.com,Global`,
+		`DOMAIN-SUFFIX,googlevideo.com,Global`,
 		`GEOIP,cn,China,no-resolve`,
 		`name: "EasyNode vless-reality"`,
 		`type: "vless"`,
@@ -51,6 +52,9 @@ func TestClashIncludesRoutingAndProxyGroups(t *testing.T) {
 	}
 	if strings.Contains(yaml, "hysteria2") {
 		t.Fatalf("stopped node leaked into clash yaml:\n%s", yaml)
+	}
+	if strings.Contains(yaml, "GEOSITE") || strings.Contains(yaml, "geox-url") {
+		t.Fatalf("clash yaml should avoid remote geodata dependency:\n%s", yaml)
 	}
 }
 

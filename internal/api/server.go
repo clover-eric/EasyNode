@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/fs"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -148,7 +149,8 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 	env := detector.Detect(req.Domain, req.IPDirect)
 	env.TLSReady = certReady
 	recs := recommender.Recommend(env)
-	nodes := nodesFromRecommendations(recs, req.Protocols, req.Domain, req.IPDirect, certReady)
+	host := configuredHost(req.Domain, req.IPDirect, r)
+	nodes := nodesFromRecommendations(recs, req.Protocols, host, certReady)
 	hash, err := util.HashPassword(req.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -165,7 +167,7 @@ func (s *Server) Setup(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(req.PanelPath, "/") && len(req.PanelPath) > 1 {
 			st.PanelPath = req.PanelPath
 		}
-		st.Domain = req.Domain
+		st.Domain = host
 		st.IPDirect = req.IPDirect
 		st.CertReady = certReady
 		st.CertPath = certPath
@@ -439,10 +441,7 @@ func (s *Server) AddNode(w http.ResponseWriter, r *http.Request) {
 				return errors.New("protocol already added")
 			}
 		}
-		host := st.Domain
-		if st.IPDirect || host == "" {
-			host = "127.0.0.1"
-		}
+		host := configuredHost(st.Domain, st.IPDirect, r)
 		node := newNodeFromRecommendation(*rec, host, st.CertReady)
 		st.Nodes = append(st.Nodes, node)
 		return nil
@@ -804,15 +803,12 @@ func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(req.PanelPath, "/") && len(req.PanelPath) > 1 {
 			st.PanelPath = req.PanelPath
 		}
-		st.Domain = req.Domain
+		host := configuredHost(req.Domain, req.IPDirect, r)
+		st.Domain = host
 		st.IPDirect = req.IPDirect
 		st.CertReady = certReady
 		st.CertPath = certPath
 		st.KeyPath = keyPath
-		host := req.Domain
-		if req.IPDirect || host == "" {
-			host = "127.0.0.1"
-		}
 		for i := range st.Nodes {
 			st.Nodes[i].Host = host
 			if protocolRunnable(st.Nodes[i].Protocol, st.CertReady) && st.Nodes[i].Status == "running" {
@@ -885,14 +881,15 @@ func (s *Server) Subscribe(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	nodes := nodesForRequest(st, r)
 	if format == "clash" || strings.EqualFold(r.URL.Query().Get("format"), "clash") || strings.EqualFold(r.URL.Query().Get("target"), "clash") {
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		w.Header().Set("Content-Disposition", `inline; filename="easynode-clash.yaml"`)
-		_, _ = w.Write([]byte(subscribe.Clash(st.Nodes)))
+		_, _ = w.Write([]byte(subscribe.Clash(nodes)))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte(subscribe.V2rayN(st.Nodes)))
+	_, _ = w.Write([]byte(subscribe.V2rayN(nodes)))
 }
 
 func (s *Server) SubscribeQRCode(w http.ResponseWriter, r *http.Request) {
@@ -1366,13 +1363,12 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func nodesFromRecommendations(recs []model.Recommendation, selected []string, domain string, ipDirect bool, certReady bool) []model.Node {
+func nodesFromRecommendations(recs []model.Recommendation, selected []string, host string, certReady bool) []model.Node {
 	want := map[string]bool{}
 	for _, p := range selected {
 		want[p] = true
 	}
-	host := domain
-	if ipDirect || host == "" {
+	if host == "" {
 		host = "127.0.0.1"
 	}
 	nodes := []model.Node{}
@@ -1438,12 +1434,73 @@ func protocolUnavailableReason(protocol string) string {
 	}
 }
 
+func configuredHost(domain string, ipDirect bool, r *http.Request) string {
+	if !ipDirect {
+		return domain
+	}
+	if domain != "" && !isLocalhost(domain) {
+		return domain
+	}
+	if h := publicHostFromRequest(r); h != "" {
+		return h
+	}
+	if env := detector.Detect("", true); env.PublicIP != "" {
+		return env.PublicIP
+	}
+	return "127.0.0.1"
+}
+
+func publicHostFromRequest(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		return ""
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if isLocalhost(host) {
+		return ""
+	}
+	return host
+}
+
+func nodesForRequest(st model.AppState, r *http.Request) []model.Node {
+	nodes := append([]model.Node(nil), st.Nodes...)
+	host := configuredHost(st.Domain, st.IPDirect, r)
+	if host == "" {
+		return nodes
+	}
+	for i := range nodes {
+		nodes[i].Host = host
+		if nodes[i].Status == "running" {
+			nodes[i].SubscribeLink = subscribe.Link(nodes[i])
+		}
+	}
+	return nodes
+}
+
+func isLocalhost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" || h == "localhost" || h == "::1" || h == "0.0.0.0" || strings.HasPrefix(h, "127.") {
+		return true
+	}
+	if ip := net.ParseIP(h); ip != nil {
+		return ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified()
+	}
+	return false
+}
+
 func (s *Server) ensureRunnableNodes() error {
 	changed := false
 	err := s.store.Update(func(st *model.AppState) error {
-		host := st.Domain
-		if st.IPDirect || host == "" {
-			host = "127.0.0.1"
+		host := configuredHost(st.Domain, st.IPDirect, nil)
+		if st.IPDirect && st.Domain == "" && host != "127.0.0.1" {
+			st.Domain = host
+			changed = true
 		}
 		for i := range st.Nodes {
 			n := &st.Nodes[i]
