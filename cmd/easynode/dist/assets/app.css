@@ -131,6 +131,6 @@ textarea{font:inherit}
   }
 }
 @media(max-width:680px){
-  .shell{padding-top:8px!important}
+  .shell{padding-top:clamp(40px,calc(env(safe-area-inset-top,0px) + 10px),58px)!important}
   .dashboardTop{margin-top:0!important}
 }
